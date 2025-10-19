@@ -564,6 +564,7 @@ const esbuildMediaScripts = [
 	'markdown-math/esbuild.mjs',
 	'notebook-renderers/esbuild.mjs',
 	'ipynb/esbuild.mjs',
+	'svgx/esbuild.mjs',
 	'simple-browser/esbuild-preview.mjs',
 ];
 

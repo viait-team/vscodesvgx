@@ -26,6 +26,7 @@ const dirs = [
 	'extensions/html-language-features',
 	'extensions/html-language-features/server',
 	'extensions/ipynb',
+	'extensions/svgx',
 	'extensions/jake',
 	'extensions/json-language-features',
 	'extensions/json-language-features/server',
