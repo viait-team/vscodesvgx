@@ -2,7 +2,99 @@ body {
     font-family: sans-serif;
 }
 
+/* Explicit theme classes set by the extension (override prefers-color-scheme) */
+.vxe-theme-dark {
+    --vxe-bg: #1e1e1e;
+    --vxe-fg: #d4d4d4;
+    --vxe-border: #333333;
+    --vxe-hover: #2a2a2a;
+    --vxe-header-bg: #252526;
+}
+.vxe-theme-light {
+    --vxe-bg: #ffffff;
+    --vxe-fg: #000000;
+    --vxe-border: #cfcfcf;
+    --vxe-hover: #efefef;
+    --vxe-header-bg: #f3f7ff;
+}
+
 pre {
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+/* context menu */
+.context-menu {
+    position: fixed;
+    background: var(--vxe-bg);
+    border: 1px solid var(--vxe-border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 9999;
+    min-width: 160px;
+    font-size: 13px;
+    color: var(--vxe-fg);
+}
+.context-menu-item {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+.context-menu-item:hover {
+    background: var(--vxe-hover);
+}
+
+/* Force enabled appearance for context menu items */
+.context-menu-item[aria-disabled="false"] {
+    opacity: 1;
+    pointer-events: auto;
+    color: var(--vxe-fg);
+}
+
+.context-menu-item[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Element header styling to visually distinguish from edit boxes */
+.node > .header {
+    background: var(--vxe-header-bg);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+.textnode textarea {
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+}
+
+/* Theme variables (light by default) */
+:root {
+    --vxe-bg: #ffffff;
+    --vxe-fg: #000000;
+    --vxe-border: #cfcfcf;
+    --vxe-hover: #efefef;
+    --vxe-header-bg: #f3f7ff;
+}
+
+/* Dark theme override */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --vxe-bg: #1e1e1e;
+        --vxe-fg: #d4d4d4;
+        --vxe-border: #333333;
+        --vxe-hover: #2a2a2a;
+        --vxe-header-bg: #252526; /* subtle panel header */
+    }
+    body {
+        background: var(--vxe-bg);
+        color: var(--vxe-fg);
+    }
+    .textnode textarea, input {
+        background: #2d2d2d;
+        color: var(--vxe-fg);
+        border: 1px solid var(--vxe-border);
+    }
+    .context-menu {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
 }

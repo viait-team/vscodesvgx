@@ -1,3 +1,6 @@
+// Copyright (c) VIAIT.
+// Licensed under the MIT License.
+
 const path = require('path');
 
 module.exports = [
