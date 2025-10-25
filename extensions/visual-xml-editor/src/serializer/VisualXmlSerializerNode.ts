@@ -1,18 +1,20 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import { VisualXmlSerializerBase, DocumentModel } from './VisualXmlSerializerBase';
 
 export class VisualXmlSerializerNode extends VisualXmlSerializerBase {
 	deserialize(content: string): DocumentModel {
-		// For now, the model is a thin wrapper around raw content.
-		return { content };
+		const parser = new XMLParser();
+		const jsonObj = parser.parse(content);
+		// For now, we'll just re-serialize the parsed document to demonstrate the concept.
+		// A more complete implementation would involve creating a richer DocumentModel.
+		const builder = new XMLBuilder({});
+		const newContent = builder.build(jsonObj);
+		return { content: newContent };
 	}
 
 	serialize(model: DocumentModel): string {
-		// Identity serialization until richer model is implemented.
+		// For now, we assume the content is already a valid XML string.
+		// A more complete implementation would serialize a richer DocumentModel.
 		return model.content;
 	}
 }

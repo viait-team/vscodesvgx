@@ -30,18 +30,14 @@ window.addEventListener('beforeunload', () => { isClosing = true; });
 window.addEventListener('unload', () => { isClosing = true; });
 window.addEventListener('pagehide', () => { isClosing = true; });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { isClosing = true; } });
-// Basic DOM-tree visual editor for XML. Features:
-// - Expand/collapse
-// - Edit element text
-// - Edit attributes
-// - Add/remove child elements
-// - Send full serialized XML to extension on changes
 
+// Simple two-panel visual XML editor (left: tree, right: attributes)
 window.addEventListener('message', event => {
 	const message = event.data;
 	switch (message.type) {
 		case 'init':
-			renderRoot(message.content);
+			console.debug('vxe: init received. experimentalTwoPanel=', !!message.experimentalTwoPanel);
+			renderRoot(message.content, true);
 			try {
 				if (message.theme === 'dark') { document.documentElement.classList.add('vxe-theme-dark'); }
 				else { document.documentElement.classList.remove('vxe-theme-dark'); }
@@ -57,9 +53,9 @@ window.addEventListener('message', event => {
 });
 
 let currentDoc = null;
+let selectedNode = null;
 
-// transient status messages shown at top
-function showStatus(msg, timeout = 3500) {
+function showStatus(msg, timeout = 2500) {
 	try {
 		let s = document.getElementById('vxe-status');
 		if (!s) {
@@ -82,356 +78,449 @@ function showStatus(msg, timeout = 3500) {
 	} catch (e) { /* ignore */ }
 }
 
-// Global right-click handler: find the nearest node container and open the context menu.
-document.addEventListener('contextmenu', (ev) => {
-	// ignore if clicking on our custom menu
-	const menu = document.getElementById('vxe-context-menu');
-	if (menu && menu.contains(ev.target)) { return; }
-
-	// find nearest parent with class 'node'
-	let el = ev.target;
-	let nodeContainer = null;
-	while (el && el !== document.body) {
-		if (el.classList && el.classList.contains && el.classList.contains('node')) { nodeContainer = el; break; }
-		el = el.parentNode;
-	}
-	if (!nodeContainer) { return; }
-	ev.preventDefault();
-	// retrieve attached xml node reference
-	const xmlNode = nodeContainer.__vxe_node;
-	// capture the specific edit element that was right-clicked (if any)
-	let clickedEdit = null;
-	try {
-		let walk = ev.target;
-		while (walk && walk !== nodeContainer && walk !== document.body) {
-			if (walk.tagName === 'TEXTAREA' || walk.tagName === 'INPUT') { clickedEdit = walk; break; }
-			walk = walk.parentNode;
-		}
-	} catch { }
-	if (!xmlNode) { return; }
-
-	const x = ev.clientX;
-	const y = ev.clientY;
-	const items = [
-		{
-			label: 'Add attribute',
-			action: () => {
-				try {
-					// Prefer the specific element that was right-clicked, then the activeElement, then fallback
-					let src = clickedEdit || null;
-					if (!src) {
-						src = document.activeElement;
-						if (src && (src.tagName === 'TEXTAREA' || src.tagName === 'INPUT')) {
-							let p = src;
-							while (p && p !== nodeContainer && p !== document.body) { p = p.parentNode; }
-							if (p !== nodeContainer) { src = null; }
-						} else { src = null; }
-					}
-
-					if (!src) {
-						// fallback: first textarea/input in the node body
-						src = nodeContainer.querySelector('.body textarea, .body input, textarea, input');
-					}
-
-					if (!src) { showStatus('No edit box found to extract attribute'); return; }
-					const raw = (src.value || '').trim();
-					if (!raw) { showStatus('Edit box is empty'); return; }
-					const [k, v] = parseAttrInput(raw);
-					if (!k) { showStatus('Could not parse attribute from edit box'); return; }
-					xmlNode.setAttribute(k, v);
-					// rebuild header attrs from the real XML node so UI stays in sync
-					try {
-						const header = nodeContainer.querySelector('.header');
-						if (header) {
-							const attrs = header.querySelector('.attrs');
-							if (attrs) {
-								attrs.innerHTML = '';
-								for (let i = 0; i < xmlNode.attributes.length; i++) {
-									const a = xmlNode.attributes[i];
-									const input = document.createElement('input');
-									input.value = `${a.name}="${a.value}"`;
-									input.addEventListener('change', () => {
-										const [nk, nv] = parseAttrInput(input.value);
-										if (nk) {
-											// if the name changed, remove the old attribute
-											if (nk !== a.name) { xmlNode.removeAttribute(a.name); }
-											xmlNode.setAttribute(nk, nv);
-										}
-									});
-									attrs.appendChild(input);
-								}
-							}
-						}
-					} catch (err) {
-						console.error('inline attrs update failed', err);
-					}
-					// clear the source edit box and blur (no transient message shown)
-					try { src.value = ''; if (src.blur) { src.blur(); } } catch (e) { /* ignore */ }
-					try {
-						const serializer = new XMLSerializer();
-						const xml = serializer.serializeToString(currentDoc || xmlNode.ownerDocument);
-						safePostMessage({ type: 'edit', content: xml });
-					} catch (e) { /* ignore */ }
-				} catch (err) {
-					console.error('add-attribute failed', err);
-					showStatus('Add attribute failed');
-				}
-			}
-		},
-		{
-			label: 'Add child element',
-			action: () => {
-				showInputDialog('Add child element', ['Name'], (vals) => {
-					const name = vals[0] && vals[0].trim();
-					if (!name) { showStatus('Child name required'); return; }
-					try {
-						const child = (currentDoc || xmlNode.ownerDocument).createElement(name);
-						xmlNode.appendChild(child);
-						const serializer = new XMLSerializer();
-						const xml = serializer.serializeToString(currentDoc || xmlNode.ownerDocument);
-						renderRoot(xml);
-						showStatus('Child added');
-						try { safePostMessage({ type: 'edit', content: xml }); } catch { }
-					} catch (err) {
-						console.error('add-child failed', err);
-						showStatus('Add child failed');
-					}
-				});
-			}
-		},
-		{
-			label: 'Delete element',
-			action: () => {
-				try {
-					if (!xmlNode.parentNode) { showStatus('Cannot delete root'); return; }
-					xmlNode.parentNode.removeChild(xmlNode);
-					const serializer = new XMLSerializer();
-					const xml = serializer.serializeToString(currentDoc || xmlNode.ownerDocument);
-					renderRoot(xml);
-					showStatus('Element deleted');
-					try { safePostMessage({ type: 'edit', content: xml }); } catch { }
-				} catch (err) {
-					console.error('delete-node failed', err);
-					showStatus('Delete failed');
-				}
-			}
-		},
-		{
-			label: 'Serialize & send to extension',
-			action: () => {
-				const serializer = new XMLSerializer();
-				const rootDoc = currentDoc || xmlNode.ownerDocument;
-				const xml = serializer.serializeToString(rootDoc);
-				safePostMessage({ type: 'edit', content: xml });
-				showStatus('Serialized & sent');
-			}
-		}
-	];
-	showContextMenu(x, y, items);
-});
-
-function renderRoot(xmlText) {
+function renderRoot(xmlText, twoPanel) {
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(xmlText, 'application/xml');
 	currentDoc = doc;
 	const root = document.getElementById('root');
+	if (!root) { console.warn('vxe: missing root element'); return; }
 	root.innerHTML = '';
-	// no persistent toolbar; actions are available via right-click (context menu)
-	const tree = renderNode(doc.documentElement);
-	root.appendChild(tree);
+
+	// container
+	const container = document.createElement('div');
+	container.id = 'vxe-two-panel';
+
+	// left: tree
+	const treeContainer = document.createElement('div');
+	treeContainer.id = 'tree-container';
+	const treeRoot = document.createElement('div');
+	treeRoot.className = 'tree-root';
+
+	// toolbar moved into the left pane (tree)
+	const toolbar = document.createElement('div');
+	toolbar.id = 'vxe-toolbar';
+	const btn = (label, title, handler) => {
+		const b = document.createElement('button');
+		b.className = 'vxe-toolbtn';
+		b.title = title || label;
+		b.innerHTML = label;
+		b.addEventListener('click', handler);
+		return b;
+	};
+	toolbar.appendChild(btn('⟳', 'Refresh (re-read file)', () => { safePostMessage({ type: 'ready' }); showStatus('Requested refresh'); }));
+	toolbar.appendChild(btn('&#x2B9B;', 'Expand all', () => { expandAll(); }));
+	toolbar.appendChild(btn('&#x2B9A;', 'Collapse all', () => { collapseAll(); }));
+
+	if (doc.documentElement) {
+		const tree = createTreeNode(doc.documentElement);
+		treeRoot.appendChild(tree);
+	}
+
+	// insert toolbar at the top of the tree root
+	treeRoot.insertBefore(toolbar, treeRoot.firstChild);
+
+	treeContainer.appendChild(treeRoot);
+
+	// right: attributes
+	const attrsContainer = document.createElement('div');
+	attrsContainer.id = 'attributes-container';
+
+	// add resizer element between left and right panes
+	const resizer = document.createElement('div');
+	resizer.id = 'vxe-resizer';
+
+	container.appendChild(treeContainer);
+	container.appendChild(resizer);
+	container.appendChild(attrsContainer);
+	root.appendChild(container);
+
+
+	// default select
+	if (doc.documentElement) { selectNode(doc.documentElement); }
+
+	// resizer drag logic
+	(function setupResizer() {
+		let dragging = false;
+		let startX = 0;
+		let startWidth = 0;
+		resizer.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			dragging = true;
+			startX = e.clientX;
+			startWidth = treeContainer.getBoundingClientRect().width;
+			document.addEventListener('mousemove', onMove);
+			document.addEventListener('mouseup', onUp);
+		});
+
+		function onMove(e) {
+			if (!dragging) { return; }
+			const dx = e.clientX - startX;
+			let newWidth = startWidth + dx;
+			const containerRect = container.getBoundingClientRect();
+			const min = 120;
+			const max = containerRect.width - 200;
+			if (newWidth < min) { newWidth = min; }
+			if (newWidth > max) { newWidth = max; }
+			treeContainer.style.flex = '0 0 ' + newWidth + 'px';
+		}
+
+		function onUp() {
+			dragging = false;
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
+		}
+	})();
 }
 
-// create a simple floating context menu. Items are functions that receive the target node.
-function showContextMenu(x, y, items) {
-	// remove existing
-	const existing = document.getElementById('vxe-context-menu');
-	if (existing) { existing.parentNode.removeChild(existing); }
+function createTreeNode(node) {
+	const container = document.createElement('div');
+	container.className = 'tree-node';
+	container.__vxe_node = node;
 
-	const menu = document.createElement('div');
-	menu.id = 'vxe-context-menu';
-	menu.className = 'context-menu';
-	menu.style.left = x + 'px';
-	menu.style.top = y + 'px';
+	// header
+	const header = document.createElement('div');
+	header.className = 'tree-header';
 
-	items.forEach(i => {
-		const el = document.createElement('div');
-		el.className = 'context-menu-item';
-		el.textContent = i.label;
-		// ensure item is enabled and focusable
-		el.setAttribute('role', 'menuitem');
-		el.setAttribute('aria-disabled', 'false');
-		el.tabIndex = 0;
-		el.style.pointerEvents = 'auto';
-		el.style.opacity = '1';
+	const exp = document.createElement('button');
+	exp.className = 'expander';
+	// Provide chevron HTML. Prefer codicon font if available, otherwise use inline SVG fallback.
+	// Detection: create a temporary element with codicon class and inspect computed font-family.
+	let _codiconAvailable = undefined;
+	function checkCodiconAvailable() {
+		if (typeof _codiconAvailable !== 'undefined') { return _codiconAvailable; }
+		try {
+			const s = document.createElement('span');
+			s.className = 'codicon codicon-chevron-right';
+			s.style.position = 'absolute'; s.style.visibility = 'hidden'; s.style.pointerEvents = 'none';
+			document.body.appendChild(s);
+			const ff = window.getComputedStyle(s).getPropertyValue('font-family') || '';
+			document.body.removeChild(s);
+			_codiconAvailable = ff.toLowerCase().indexOf('codicon') !== -1 || ff.toLowerCase().indexOf('codicon') !== -1;
+		} catch (e) { _codiconAvailable = false; }
+		return _codiconAvailable;
+	}
 
-		el.addEventListener('mousedown', (e) => { e.stopPropagation(); });
-		el.addEventListener('click', (ev) => {
-			try { i.action(); } catch (e) { console.error(e); showStatus('Action failed'); }
-			if (menu.parentNode) { menu.parentNode.removeChild(menu); }
-		});
-		el.addEventListener('keydown', (ev) => {
-			if (ev.key === 'Enter' || ev.key === ' ') {
-				ev.preventDefault();
-				el.click();
-			}
-		});
-		menu.appendChild(el);
+	function rightChevron() {
+		if (checkCodiconAvailable()) { return '<span class="codicon codicon-chevron-right" aria-hidden="true"></span>'; }
+		return '<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 2 L7 5 L3 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	}
+	function downChevron() {
+		if (checkCodiconAvailable()) { return '<span class="codicon codicon-chevron-down" aria-hidden="true"></span>'; }
+		return '<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 3 L5 7 L8 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	}
+	const hasChildren = node.childNodes && Array.from(node.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
+	if (hasChildren) { exp.innerHTML = rightChevron(); container.dataset.expanded = 'false'; exp.setAttribute('aria-expanded', 'false'); exp.setAttribute('aria-label', 'Expand'); }
+	else { exp.innerHTML = ''; container.dataset.expanded = 'false'; exp.setAttribute('aria-hidden', 'true'); }
+	header.appendChild(exp);
+
+	const name = document.createElement('span');
+	name.className = 'tree-name';
+	name.textContent = node.nodeName;
+	header.appendChild(name);
+
+	// inline attrs count
+	//const count = document.createElement('span');
+	//count.className = 'tree-attrs-count';
+	//count.textContent = node.attributes && node.attributes.length ? ` ${node.attributes.length}` : '';
+	//header.appendChild(count);
+
+	header.addEventListener('click', () => { selectNode(node, container); });
+
+	container.appendChild(header);
+
+	const body = document.createElement('div');
+	body.className = 'tree-children';
+	Array.from(node.childNodes).forEach(child => {
+		if (child.nodeType === Node.ELEMENT_NODE) {
+			body.appendChild(createTreeNode(child));
+		}
+	});
+	container.appendChild(body);
+
+	// expander
+	exp.addEventListener('click', (ev) => {
+		ev.stopPropagation();
+		if (body.style.display === 'none' || container.dataset.expanded === 'false') { body.style.display = ''; exp.innerHTML = downChevron(); container.dataset.expanded = 'true'; exp.setAttribute('aria-expanded', 'true'); exp.setAttribute('aria-label', 'Collapse'); }
+		else { body.style.display = 'none'; exp.innerHTML = rightChevron(); container.dataset.expanded = 'false'; exp.setAttribute('aria-expanded', 'false'); exp.setAttribute('aria-label', 'Expand'); }
 	});
 
-	document.body.appendChild(menu);
-	// focus the menu so keyboard events work
-	try { menu.tabIndex = -1; menu.focus(); } catch { }
-
-	// prevent mousedown inside the menu from closing it (some browsers fire click immediately)
-	menu.addEventListener('mousedown', (e) => { e.stopPropagation(); });
-
-	const onClick = (e) => {
-		if (!menu.contains(e.target)) {
-			menu.remove();
-			document.removeEventListener('click', onClick);
+	// keyboard accessibility: toggle on Enter or Space
+	exp.addEventListener('keydown', (ev) => {
+		if (ev.key === 'Enter' || ev.key === ' ') {
+			ev.preventDefault();
+			ev.stopPropagation();
+			exp.click();
 		}
-	};
+	});
 
-	// Delay attaching the click listener so the initial mouseup/click that triggered
-	// the contextmenu doesn't immediately close the menu.
-	setTimeout(() => document.addEventListener('click', onClick), 50);
-}
-
-function renderNode(node) {
-	if (!node) { return document.createElement('div'); }
-	const container = document.createElement('div');
-	container.className = 'node';
-
-	// attach the XML node reference early so global handlers can find it
-	try { container.__vxe_node = node; } catch { /* ignore */ }
-
-	if (node.nodeType === Node.ELEMENT_NODE) {
-		const header = document.createElement('div');
-		header.className = 'header';
-
-		const exp = document.createElement('button');
-		exp.textContent = '-';
-		exp.addEventListener('click', () => {
-			const body = container.querySelector('.body');
-			if (body.style.display === 'none') { body.style.display = ''; exp.textContent = '-'; }
-			else { body.style.display = 'none'; exp.textContent = '+'; }
-		});
-		header.appendChild(exp);
-
-		const name = document.createElement('span');
-		name.className = 'name';
-		name.textContent = node.nodeName;
-		header.appendChild(name);
-
-		// attributes
-		const attrs = document.createElement('span');
-		attrs.className = 'attrs';
-		for (let i = 0; i < node.attributes.length; i++) {
-			const a = node.attributes[i];
-			const input = document.createElement('input');
-			input.value = `${a.name}="${a.value}"`;
-			input.addEventListener('change', () => {
-				const [k, v] = parseAttrInput(input.value);
-				node.setAttribute(k, v);
-			});
-			attrs.appendChild(input);
-		}
-		header.appendChild(attrs);
-
-		// (no persistent Add attr button - use the popup context menu)
-
-		// (already attached earlier)
-
-		container.appendChild(header);
-
-		const body = document.createElement('div');
-		body.className = 'body';
-		// children
-		for (let c = 0; c < node.childNodes.length; c++) {
-			const child = node.childNodes[c];
-			if (child.nodeType === Node.TEXT_NODE) {
-				const p = document.createElement('div');
-				p.className = 'textnode';
-				const input = document.createElement('textarea');
-				input.value = child.nodeValue;
-				input.addEventListener('change', () => { child.nodeValue = input.value; });
-				p.appendChild(input);
-				body.appendChild(p);
-			} else if (child.nodeType === Node.ELEMENT_NODE) {
-				body.appendChild(renderNode(child));
-			}
-		}
-
-		container.appendChild(body);
-	} else {
-		container.textContent = node.nodeName;
-	}
+	// context menu on right click: dynamic items based on node
+	container.addEventListener('contextmenu', (ev) => {
+		ev.preventDefault();
+		const items = [];
+		items.push({ label: 'Copy XPath', action: () => { try { const path = computeXPath(node); safePostMessage({ type: 'debug', msg: 'xpath:' + path }); showStatus('Copied XPath to output'); } catch { } } });
+		items.push({ label: 'Add attribute', action: () => { promptAddAttribute(node); } });
+		items.push({ label: 'Add child', action: () => { promptAddChild(node); } });
+		if (node.attributes && node.attributes.length) { items.push({ label: 'Edit attributes', action: () => { selectNode(node); } }); }
+		// only allow delete if not root
+		if (node.parentNode) { items.push({ label: 'Delete', action: () => { deleteNode(node); } }); }
+		showContextMenu(ev.clientX, ev.clientY, items);
+	});
 
 	return container;
 }
 
-// small modal input dialog used instead of window.prompt (more reliable in webviews)
+function selectNode(node, containerEl) {
+	selectedNode = node;
+	// clear previous selection
+	document.querySelectorAll('.tree-header.selected').forEach(h => h.classList.remove('selected'));
+	try {
+		if (!containerEl) {
+			// find element
+			const all = document.querySelectorAll('[__vxe_node]');
+		}
+		// highlight header for the node
+		const headers = Array.from(document.querySelectorAll('.tree-node')).filter(n => n.__vxe_node === node).map(n => n.querySelector('.tree-header'));
+		headers.forEach(h => { if (h) { h.classList.add('selected'); } });
+	} catch { }
+	renderAttributes(node);
+}
+
+function expandAll() {
+	document.querySelectorAll('.tree-node').forEach(n => {
+		const body = n.querySelector('.tree-children');
+		const exp = n.querySelector('.expander');
+		if (body) { body.style.display = ''; n.dataset.expanded = 'true'; }
+		if (exp) { exp.innerHTML = downChevron(); exp.setAttribute('aria-expanded', 'true'); }
+	});
+}
+
+function collapseAll() {
+	document.querySelectorAll('.tree-node').forEach(n => {
+		const body = n.querySelector('.tree-children');
+		const exp = n.querySelector('.expander');
+		if (body) { body.style.display = 'none'; n.dataset.expanded = 'false'; }
+		if (exp) { exp.innerHTML = rightChevron(); exp.setAttribute('aria-expanded', 'false'); }
+	});
+}
+
+function computeXPath(node) {
+	if (!node) { return ''; }
+	const parts = [];
+	let cur = node;
+	while (cur && cur.nodeType === Node.ELEMENT_NODE) {
+		let idx = 1;
+		let sib = cur.previousSibling;
+		while (sib) {
+			if (sib.nodeType === Node.ELEMENT_NODE && sib.nodeName === cur.nodeName) { idx++; }
+			sib = sib.previousSibling;
+		}
+		parts.unshift(cur.nodeName + '[' + idx + ']');
+		cur = cur.parentNode;
+	}
+	return '/' + parts.join('/');
+}
+
+function promptAddAttribute(node) {
+	showInputDialog('Add attribute', ['Name', 'Value'], (vals) => {
+		const n = (vals && vals[0]) ? vals[0].trim() : ''; const v = (vals && vals[1]) ? vals[1] : '';
+		if (!n) { showStatus('Attribute name required'); return; }
+		node.setAttribute(n, v);
+		renderAttributes(node);
+		postDocumentChange();
+	});
+}
+
+function renderAttributes(node) {
+	const attrsContainer = document.getElementById('attributes-container');
+	if (!attrsContainer) { return; }
+	attrsContainer.innerHTML = '';
+
+	const h = document.createElement('div');
+	h.className = 'attrs-header';
+	h.textContent = node.nodeName;
+	attrsContainer.appendChild(h);
+
+	// NEW: Add editable text content area
+	const textContentContainer = document.createElement('div');
+	textContentContainer.className = 'text-content-container';
+
+	const textContentInput = document.createElement('input');
+	textContentInput.className = 'text-content-input';
+	
+	// find the text node
+	let textNode = null;
+	for (const child of node.childNodes) {
+		if (child.nodeType === Node.TEXT_NODE) {
+			textNode = child;
+			break;
+		}
+	}
+
+	textContentInput.value = textNode ? textNode.nodeValue.trim() : '';
+	textContentInput.addEventListener('change', () => {
+		if (textNode) {
+			textNode.nodeValue = textContentInput.value;
+		} else {
+			// If no text node exists, create one
+			node.appendChild(document.createTextNode(textContentInput.value));
+		}
+		postDocumentChange();
+	});
+	textContentContainer.appendChild(textContentInput);
+	attrsContainer.appendChild(textContentContainer);
+
+	// NEW: Add separator
+	const separator = document.createElement('hr');
+	separator.className = 'section-separator';
+	attrsContainer.appendChild(separator);
+
+
+	const list = document.createElement('div');
+	list.className = 'attrs-list';
+
+	if (node.attributes) {
+		for (let i = 0; i < node.attributes.length; i++) {
+			const a = node.attributes[i];
+			const row = document.createElement('div');
+			row.className = 'attr-row';
+
+			const nameInput = document.createElement('input');
+			nameInput.className = 'attr-name';
+			nameInput.value = a.name;
+
+			const valInput = document.createElement('input');
+			valInput.className = 'attr-value';
+			valInput.value = a.value;
+
+			const del = document.createElement('button');
+			del.className = 'attr-del';
+			del.textContent = 'Delete';
+			del.addEventListener('click', () => {
+				node.removeAttribute(a.name);
+				renderAttributes(node);
+				postDocumentChange();
+			});
+
+			nameInput.addEventListener('change', () => {
+				const newName = nameInput.value.trim();
+				const val = valInput.value;
+				if (newName && newName !== a.name) {
+					node.removeAttribute(a.name);
+					node.setAttribute(newName, val);
+					renderAttributes(node);
+					postDocumentChange();
+				}
+			});
+
+			valInput.addEventListener('change', () => {
+				node.setAttribute(a.name, valInput.value);
+				postDocumentChange();
+			});
+
+			row.appendChild(nameInput);
+			row.appendChild(valInput);
+			row.appendChild(del);
+			list.appendChild(row);
+		}
+	}
+
+	const addRow = document.createElement('div');
+	addRow.className = 'attr-add-row';
+	const addName = document.createElement('input'); addName.placeholder = 'name';
+	const addVal = document.createElement('input'); addVal.placeholder = 'value';
+	const addBtn = document.createElement('button'); addBtn.textContent = 'Add Attribute';
+	addBtn.addEventListener('click', () => {
+		const n = addName.value.trim();
+		if (!n) { showStatus('Name required'); return; }
+		node.setAttribute(n, addVal.value || '');
+		renderAttributes(node);
+		postDocumentChange();
+	});
+
+	addRow.appendChild(addName); addRow.appendChild(addVal); addRow.appendChild(addBtn);
+	attrsContainer.appendChild(list);
+	attrsContainer.appendChild(addRow);
+
+	// actions: add child / delete element
+	/* 	const actionRow = document.createElement('div'); actionRow.className = 'attr-actions';
+		const addChildBtn = document.createElement('button'); addChildBtn.textContent = 'Add child';
+		addChildBtn.addEventListener('click', () => { promptAddChild(node); });
+		const deleteBtn = document.createElement('button'); deleteBtn.textContent = 'Delete element';
+		deleteBtn.addEventListener('click', () => { deleteNode(node); });
+		actionRow.appendChild(addChildBtn); actionRow.appendChild(deleteBtn);
+		attrsContainer.appendChild(actionRow);
+	*/
+}
+
+function postDocumentChange() {
+	try {
+		const serializer = new XMLSerializer();
+		const xml = serializer.serializeToString(currentDoc || document);
+		safePostMessage({ type: 'edit', content: xml });
+	} catch (e) { console.error('postDocumentChange failed', e); }
+}
+
+function promptAddChild(node) {
+	showInputDialog('Add child element', ['Name'], (vals) => {
+		const name = vals[0] && vals[0].trim();
+		if (!name) { showStatus('Child name required'); return; }
+		try {
+			const child = (currentDoc || node.ownerDocument).createElement(name);
+			node.appendChild(child);
+			// re-render tree and re-select
+			renderRoot(new XMLSerializer().serializeToString(currentDoc), true);
+			showStatus('Child added');
+			postDocumentChange();
+		} catch (err) { console.error('add-child failed', err); showStatus('Add child failed'); }
+	});
+}
+
+function deleteNode(node) {
+	try {
+		if (!node.parentNode) { showStatus('Cannot delete root'); return; }
+		node.parentNode.removeChild(node);
+		renderRoot(new XMLSerializer().serializeToString(currentDoc), true);
+		postDocumentChange();
+		showStatus('Element deleted');
+	} catch (err) { console.error('delete-node failed', err); showStatus('Delete failed'); }
+}
+
+// simple context menu
+function showContextMenu(x, y, items) {
+	const existing = document.getElementById('vxe-context-menu');
+	if (existing) { existing.remove(); }
+	const menu = document.createElement('div'); menu.id = 'vxe-context-menu'; menu.className = 'context-menu';
+	menu.style.left = x + 'px'; menu.style.top = y + 'px';
+	items.forEach(i => {
+		const el = document.createElement('div'); el.className = 'context-menu-item'; el.textContent = i.label;
+		el.tabIndex = 0; el.addEventListener('click', () => { try { i.action(); } catch (e) { console.error(e); } menu.remove(); });
+		menu.appendChild(el);
+	});
+	document.body.appendChild(menu);
+	setTimeout(() => document.addEventListener('click', () => { menu.remove(); }), 50);
+}
+
 function showInputDialog(title, labels, callback) {
 	try {
-		// remove existing dialog
-		const existing = document.getElementById('vxe-input-dialog');
-		if (existing) { existing.remove(); }
-
-		const overlay = document.createElement('div');
-		overlay.id = 'vxe-input-dialog';
-		overlay.style.position = 'fixed';
-		overlay.style.left = '0'; overlay.style.top = '0'; overlay.style.right = '0'; overlay.style.bottom = '0';
-		overlay.style.background = 'rgba(0,0,0,0.3)';
-		overlay.style.zIndex = 10001;
-
-		const box = document.createElement('div');
-		box.style.width = '320px'; box.style.margin = '120px auto'; box.style.background = '#fff'; box.style.padding = '12px'; box.style.borderRadius = '6px';
-		box.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)'; box.style.fontFamily = 'sans-serif';
-
+		const existing = document.getElementById('vxe-input-dialog'); if (existing) { existing.remove(); }
+		const overlay = document.createElement('div'); overlay.id = 'vxe-input-dialog'; overlay.style.position = 'fixed'; overlay.style.left = '0'; overlay.style.top = '0'; overlay.style.right = '0'; overlay.style.bottom = '0'; overlay.style.background = 'rgba(0,0,0,0.3)'; overlay.style.zIndex = 10001;
+		const box = document.createElement('div'); box.style.width = '320px'; box.style.margin = '120px auto'; box.style.background = '#fff'; box.style.padding = '12px'; box.style.borderRadius = '6px'; box.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
 		const h = document.createElement('div'); h.textContent = title; h.style.fontWeight = '600'; h.style.marginBottom = '8px'; box.appendChild(h);
-
 		const inputs = [];
-		labels.forEach(l => {
-			const row = document.createElement('div'); row.style.marginBottom = '8px';
-			const lab = document.createElement('div'); lab.textContent = l; lab.style.fontSize = '12px'; row.appendChild(lab);
-			const inp = document.createElement('input'); inp.type = 'text'; inp.style.width = '100%'; inp.style.boxSizing = 'border-box'; row.appendChild(inp);
-			box.appendChild(row); inputs.push(inp);
-		});
-
-		const btnRow = document.createElement('div'); btnRow.style.textAlign = 'right';
-		const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', () => { overlay.remove(); });
-		const ok = document.createElement('button'); ok.textContent = 'OK'; ok.style.marginLeft = '8px';
-		ok.addEventListener('click', () => {
-			const vals = inputs.map(i => i.value);
-			overlay.remove();
-			try { callback(vals); } catch (e) { console.error(e); }
-		});
-		btnRow.appendChild(cancel); btnRow.appendChild(ok); box.appendChild(btnRow);
-
-		overlay.appendChild(box); document.body.appendChild(overlay);
-		inputs[0].focus();
-		return overlay;
+		labels.forEach(l => { const row = document.createElement('div'); row.style.marginBottom = '8px'; const lab = document.createElement('div'); lab.textContent = l; lab.style.fontSize = '12px'; row.appendChild(lab); const inp = document.createElement('input'); inp.type = 'text'; inp.style.width = '100%'; inp.style.boxSizing = 'border-box'; row.appendChild(inp); box.appendChild(row); inputs.push(inp); });
+		const btnRow = document.createElement('div'); btnRow.style.textAlign = 'right'; const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', () => { overlay.remove(); }); const ok = document.createElement('button'); ok.textContent = 'OK'; ok.style.marginLeft = '8px'; ok.addEventListener('click', () => { const vals = inputs.map(i => i.value); overlay.remove(); try { callback(vals); } catch (e) { console.error(e); } }); btnRow.appendChild(cancel); btnRow.appendChild(ok); box.appendChild(btnRow);
+		overlay.appendChild(box); document.body.appendChild(overlay); inputs[0].focus(); return overlay;
 	} catch (e) { console.error('showInputDialog failed', e); }
 }
 
 function parseAttrInput(s) {
-	const m = s.match(/^([^=\s]+)=(?:\"([^\"]*)\"|'([^']*)'|([^\s]*))$/);
+	const m = s.match(/^([^=\s]+)=(?:"([^"]*)"|'([^']*)'|([^\s]*))$/);
 	if (m) { return [m[1], m[2] || m[3] || m[4] || '']; }
-	// fallback split on =
-	const idx = s.indexOf('=');
-	if (idx === -1) { return [s, '']; }
-	const k = s.substring(0, idx).trim();
-	let v = s.substring(idx + 1).trim();
-	// remove surrounding single or double quotes if present (use char codes to avoid quoting lint rules)
-	if (v.length >= 2) {
-		const first = v.charCodeAt(0);
-		const last = v.charCodeAt(v.length - 1);
-		if ((first === 34 && last === 34) || (first === 39 && last === 39)) {
-			v = v.substring(1, v.length - 1);
-		}
-	}
+	const idx = s.indexOf('='); if (idx === -1) { return [s, '']; }
+	const k = s.substring(0, idx).trim(); let v = s.substring(idx + 1).trim();
+	if (v.length >= 2) { const first = v.charCodeAt(0); const last = v.charCodeAt(v.length - 1); if ((first === 34 && last === 34) || (first === 39 && last === 39)) { v = v.substring(1, v.length - 1); } }
 	return [k, v];
 }
 
-// notify extension that webview is ready
+// initial ready notification
 safePostMessage({ type: 'ready' });

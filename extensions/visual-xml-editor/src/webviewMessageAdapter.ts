@@ -22,7 +22,7 @@ export async function processWebviewMessage(
 	webviewPanel: vscode.WebviewPanel,
 	serializer: VisualXmlSerializerNode,
 	output: vscode.OutputChannel,
-	context: vscode.ExtensionContext
+	_context: vscode.ExtensionContext
 ) {
 	try {
 		switch (e.type) {

@@ -5,6 +5,7 @@
 
 import * as vscode from "vscode";
 import { VisualXmlSerializerNode } from "./serializer/VisualXmlSerializerNode";
+import { processWebviewMessage } from "./webviewMessageAdapter";
 
 export function activate(extensionContext: vscode.ExtensionContext) {
 	extensionContext.subscriptions.push(
@@ -93,16 +94,23 @@ class VisualEditorProvider
 							try {
 								const data = await vscode.workspace.fs.readFile(document.uri);
 								const xml = new TextDecoder().decode(data);
-								const model = serializer.deserialize(xml);
-								// include the current color theme so the webview can render correctly
+								// Prefer sending the raw XML to the webview for initial render. The webview
+								// uses DOMParser to parse XML; passing the original text avoids potential
+								// re-serialization differences that can produce parse errors in the webview.
+								// keep serializer available for future messages, but don't re-serialize here
+								// include the current color theme and experimental flag so the webview can opt in
 								const isDark = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-								try { webviewPanel.webview.postMessage({ type: "init", content: model.content, theme: isDark ? 'dark' : 'light' }); } catch (err) { /* ignore */ }
+								// Enable the two-panel UI by default for the new design.
+								const twoPanel = true;
+								// Send the original XML text for initialization to avoid DOMParser producing
+								// an HTML <parsererror> document when given altered/re-serialized input.
+								try { webviewPanel.webview.postMessage({ type: "init", content: xml, theme: isDark ? "dark" : "light", experimentalTwoPanel: twoPanel }); output.appendLine('visual-xml-editor: init posted (experimentalTwoPanel=' + String(twoPanel) + ')'); } catch (err) { /* ignore */ }
 
 								// notify the webview if the theme changes while the panel is open
 								try {
 									const themeListener = vscode.window.onDidChangeActiveColorTheme((t) => {
 										const nowDark = t.kind === vscode.ColorThemeKind.Dark;
-										try { webviewPanel.webview.postMessage({ type: 'theme', theme: nowDark ? 'dark' : 'light' }); } catch { }
+										try { webviewPanel.webview.postMessage({ type: "theme", theme: nowDark ? "dark" : "light" }); } catch { }
 									});
 									this.context.subscriptions.push(themeListener);
 								} catch { /* ignore */ }
@@ -111,19 +119,15 @@ class VisualEditorProvider
 							}
 							break;
 						}
-						case "edit": {
+						case "edit":
+						case "incremental":
+						case "fullDocument":
+						case "requestSave": {
+							// Delegate to adapter which knows how to handle both full and future incremental messages
 							try {
-								const incoming = e.content as string;
-								try { output.appendLine('webview -> edit (received)'); } catch { }
-								const model = serializer.deserialize(incoming);
-								const serialized = serializer.serialize(model);
-								const edit = new vscode.WorkspaceEdit();
-								edit.replace(document.uri, new vscode.Range(0, 0, 9999, 9999), serialized);
-								await vscode.workspace.applyEdit(edit);
-								try { output.appendLine('applyEdit invoked'); } catch { }
+								await processWebviewMessage(e, document, webviewPanel, serializer, output, this.context);
 							} catch (err) {
-								console.error('Error applying edit from webview', err);
-								try { output.appendLine('applyEdit failed: ' + String(err)); } catch { }
+								console.error('adapter processing failed', err);
 							}
 							break;
 						}
@@ -151,16 +155,16 @@ class VisualEditorProvider
 
 	public saveCustomDocument(
 		document: VisualXmlDocument,
-		cancellation: vscode.CancellationToken,
+		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
 		// For now, delegate to saveAs which currently reads/writes the same content.
-		return this.saveCustomDocumentAs(document, document.uri, cancellation);
+		return this.saveCustomDocumentAs(document, document.uri, _cancellation);
 	}
 
 	public saveCustomDocumentAs(
 		document: VisualXmlDocument,
 		destination: vscode.Uri,
-		cancellation: vscode.CancellationToken,
+		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
 		// This is a simplified save implementation. In a real-world scenario, you would
 		// get the content from the webview and save it to the file.
@@ -180,12 +184,12 @@ class VisualEditorProvider
 
 	public revertCustomDocument(
 		document: VisualXmlDocument,
-		cancellation: vscode.CancellationToken,
+		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
 		// Revert to the file on disk.
 		return vscode.workspace.fs
 			.readFile(document.uri)
-			.then((data: Uint8Array) => {
+			.then((_data: Uint8Array) => {
 				// This is a simplified revert. A real implementation would send the content
 				// back to the webview to update its state.
 				return;
@@ -193,9 +197,9 @@ class VisualEditorProvider
 	}
 
 	public backupCustomDocument(
-		document: VisualXmlDocument,
+		_document: VisualXmlDocument,
 		context: vscode.CustomDocumentBackupContext,
-		cancellation: vscode.CancellationToken,
+		_cancellation: vscode.CancellationToken,
 	): Thenable<vscode.CustomDocumentBackup> {
 		// A real implementation would save a backup of the file.
 		return Promise.resolve({
@@ -219,6 +223,15 @@ class VisualEditorProvider
 			vscode.Uri.joinPath(this.context.extensionUri, "webview", "style.css"),
 		);
 
+		// Try to expose VS Code codicon styles from the product sources so webview can use exact icons
+		const codiconCssLocal = vscode.Uri.joinPath(this.context.extensionUri, '..', '..', 'src', 'vs', 'base', 'browser', 'ui', 'codicons', 'codicon', 'codicon.css');
+		let codiconUri: vscode.Uri | undefined = undefined;
+		try {
+			codiconUri = webview.asWebviewUri(codiconCssLocal);
+		} catch {
+			codiconUri = undefined;
+		}
+
 		return /* html */ `
             <!DOCTYPE html>
             <html lang="en">
@@ -226,7 +239,8 @@ class VisualEditorProvider
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Visual XML Editor</title>
-                <link rel="stylesheet" href="${styleUri}">
+				<link rel="stylesheet" href="${styleUri}">
+				${codiconUri ? `<link rel="stylesheet" href="${codiconUri}">` : ''}
             </head>
             <body>
                 <div id="root"></div>

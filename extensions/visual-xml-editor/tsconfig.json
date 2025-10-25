@@ -1,22 +1,12 @@
 {
+	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
-		"module": "commonjs",
-		"target": "es2020",
-		"lib": [
-			"es2020",
-			"webworker"
-		],
-		"sourceMap": true,
-		"strict": true,
-		"rootDir": "src",
-        "moduleResolution": "node"
+		"skipLibCheck": true,
+		"outDir": "./out",
+		"lib": ["dom"]
 	},
 	"include": [
 		"src",
 		"../../src/vscode-dts/vscode.d.ts"
-	],
-	"exclude": [
-		"node_modules",
-		".vscode-test"
 	]
 }
