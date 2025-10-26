@@ -6,16 +6,16 @@
 import { VisualXmlSerializerBase, DocumentModel } from './VisualXmlSerializerBase';
 
 export class VisualXmlSerializerWeb extends VisualXmlSerializerBase {
-	deserialize(content: string): DocumentModel {
+	async deserialize(content: string): Promise<DocumentModel> {
 		const parser = new DOMParser();
-		const xmlDoc = parser.parseFromString(content, "text/xml");
+		const xmlDoc = parser.parseFromString(content, 'text/xml');
 		// For now, we'll just re-serialize the parsed document to demonstrate the concept.
 		// A more complete implementation would involve creating a richer DocumentModel.
 		const newContent = new XMLSerializer().serializeToString(xmlDoc);
 		return { content: newContent };
 	}
 
-	serialize(model: DocumentModel): string {
+	async serialize(model: DocumentModel): Promise<string> {
 		// For now, we assume the content is already a valid XML string.
 		// A more complete implementation would serialize a richer DocumentModel.
 		return model.content;

@@ -11,10 +11,10 @@ export abstract class VisualXmlSerializerBase {
 	/**
 	 * Convert XML text into an in-memory document model.
 	 */
-	abstract deserialize(content: string): DocumentModel;
+	abstract deserialize(content: string): Promise<DocumentModel>;
 
 	/**
 	 * Convert the in-memory document model back into XML text.
 	 */
-	abstract serialize(model: DocumentModel): string;
+	abstract serialize(model: DocumentModel): Promise<string>;
 }

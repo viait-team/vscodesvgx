@@ -3,6 +3,31 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+// SVGX Notebook Serializer
+// This file implements the following pattern:
+//
+// 1. A `NotebookSerializerBase` class is defined. This class is responsible for the core
+//    serialization and deserialization logic. It is designed to be extended by other
+//    classes that provide environment-specific implementations (node or web).
+//
+// 2. The `NotebookSerializerBase` class is abstract and provides the `deserializeNotebook`
+//    and `serializeNotebook` methods. These methods are responsible for converting the
+//    `.svgx` file content to a `vscode.NotebookData` object and vice versa.
+//
+// 3. The `deserializeNotebook` method handles the reading of the `.svgx` file, which is
+//    a JSON-based format. It also handles a `__webview_backup` property, which is a
+//    custom implementation for the `svgx` extension.
+//
+// 4. The `serializeNotebook` method takes a `vscode.NotebookData` object and converts it
+//    to a string, which is then encoded as a `Uint8Array`. This method is designed to be
+//    offloaded to a worker thread for performance.
+//
+// This pattern is inspired by the `ipynb` extension, which uses a similar approach to
+// handle the serialization of Jupyter notebooks. The goal is to provide a consistent
+// and performant serialization mechanism that can be used in both the node and web
+// environments.
+
+
 import type * as nbformat from '@jupyterlab/nbformat';
 import detectIndent from 'detect-indent';
 import * as vscode from 'vscode';

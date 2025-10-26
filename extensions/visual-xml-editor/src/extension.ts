@@ -49,7 +49,7 @@ class VisualEditorProvider
 		};
 		webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
 
-		const serializer = new VisualXmlSerializerNode();
+		const serializer = new VisualXmlSerializerNode(this.context);
 
 		const output = vscode.window.createOutputChannel('Visual XML Editor');
 		this.context.subscriptions.push(output);
@@ -170,16 +170,17 @@ class VisualEditorProvider
 		// get the content from the webview and save it to the file.
 		// For now, we'll just read the document and write it back to the new location.
 		// Read existing file, serialize via serializer and write to destination.
-		const serializer = new VisualXmlSerializerNode();
-		return vscode.workspace.fs.readFile(document.uri).then((data) => {
+		const serializer = new VisualXmlSerializerNode(this.context);
+		return (async () => {
+			const data = await vscode.workspace.fs.readFile(document.uri);
 			const xml = new TextDecoder().decode(data);
-			const model = serializer.deserialize(xml);
-			const serialized = serializer.serialize(model);
+			const model = await serializer.deserialize(xml);
+			const serialized = await serializer.serialize(model);
 			return vscode.workspace.fs.writeFile(
 				destination,
-				Buffer.from(serialized, "utf8"),
+				Buffer.from(serialized, 'utf8'),
 			);
-		});
+		})();
 	}
 
 	public revertCustomDocument(

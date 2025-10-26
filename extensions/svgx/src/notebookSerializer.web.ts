@@ -3,6 +3,33 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+// SVGX Notebook Serializer for the Web
+// This file implements the following pattern:
+//
+// 1. A `NotebookSerializer` class is defined, which extends the `NotebookSerializerBase`
+//    class. This class is responsible for the serialization of `.svgx` files in the
+//    web environment.
+//
+// 2. The `NotebookSerializer` class uses a worker thread to offload the serialization
+//    of the notebook data. This is done to avoid blocking the main thread, which can
+//    improve performance and responsiveness.
+//
+// 3. The worker thread is enabled by the `svgx.experimental.serialization` setting.
+//    If this setting is disabled, the serialization is done in the main thread using
+//    the `NotebookSerializerBase` implementation.
+//
+// 4. The worker thread is implemented in the `notebookSerializerWorker.js` file. This
+//    file is loaded using the standard `Worker` API.
+//
+// 5. Communication between the main thread and the worker thread is done using the
+//    `postMessage` method and the `onmessage` event. A `DeferredPromise` is used to
+//    wait for the result from the worker.
+//
+// This pattern is a direct copy of the `ipynb` extension's implementation, which uses
+// a similar approach to handle the serialization of Jupyter notebooks in the web
+// environment.
+
+
 import * as vscode from 'vscode';
 import { DeferredPromise, generateUuid } from './helper';
 import { NotebookSerializerBase } from './notebookSerializer';

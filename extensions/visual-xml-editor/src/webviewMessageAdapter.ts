@@ -29,8 +29,8 @@ export async function processWebviewMessage(
 			case "edit": {
 				const incoming = e.content as string;
 				try { output.appendLine("adapter: webview -> edit (received)"); } catch { }
-				const model = serializer.deserialize(incoming);
-				const serialized = serializer.serialize(model);
+				const model = await serializer.deserialize(incoming);
+				const serialized = await serializer.serialize(model);
 				const edit = new vscode.WorkspaceEdit();
 				edit.replace(document.uri, new vscode.Range(0, 0, 9999, 9999), serialized);
 				await vscode.workspace.applyEdit(edit);
@@ -46,8 +46,8 @@ export async function processWebviewMessage(
 			case "fullDocument": {
 				// Legacy/explicit full document message
 				const xml = e.xml as string;
-				const model = serializer.deserialize(xml);
-				const serialized = serializer.serialize(model);
+				const model = await serializer.deserialize(xml);
+				const serialized = await serializer.serialize(model);
 				const edit = new vscode.WorkspaceEdit();
 				edit.replace(document.uri, new vscode.Range(0, 0, 9999, 9999), serialized);
 				await vscode.workspace.applyEdit(edit);

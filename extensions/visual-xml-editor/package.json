@@ -11,7 +11,7 @@
   ],
   "main": "./out/extension.js",
   "scripts": {
-    "compile": "npx gulp compile-extension:visual-xml-editor",
+    "compile": "npx gulp compile-extension:visual-xml-editor && npx gulp --gulpfile ./gulpfile.copy-webview.js copy-webview",
     "watch": "npx gulp watch-extension:visual-xml-editor"
   },
   "contributes": {
@@ -33,6 +33,13 @@
       }
     ]
   },
+  "files": [
+    "out/**",
+    "dist/**",
+    "webview/**",
+    "package.json",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/vscode": "^1.84.0",
     "fast-xml-parser": "^5.3.0",
