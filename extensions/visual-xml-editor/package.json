@@ -7,7 +7,8 @@
     "vscode": "^1.84.0"
   },
   "activationEvents": [
-    "onCustomEditor:xml.visualEditor"
+    "onCustomEditor:xml.visualEditor",
+    "onCommand:xml.showPreview"
   ],
   "main": "./out/extension.js",
   "scripts": {
@@ -15,21 +16,93 @@
     "watch": "npx gulp watch-extension:visual-xml-editor"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "xml.showPreview",
+        "title": "Open Preview",
+        "category": "XML"
+      },
+      {
+        "command": "xml.showPreviewToSide",
+        "title": "Open Preview to the Side",
+        "category": "XML"
+      },
+      {
+        "command": "xml.openInBrowser",
+        "title": "Open in Browser",
+        "category": "XML"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.showPreviewToSide",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.showPreview",
+          "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.showPreviewToSide",
+          "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.openInBrowser",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.showPreview"
+        },
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.showPreviewToSide"
+        },
+        {
+          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "command": "xml.openInBrowser"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "XML",
+      "properties": {
+        "xml.preview.scrollPreviewWithEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scroll the preview with the editor."
+        },
+        "xml.preview.scrollEditorWithPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scroll the editor with the preview."
+        }
+      }
+    },
     "customEditors": [
       {
         "viewType": "xml.visualEditor",
         "displayName": "Visual XML Editor",
         "selector": [
-            {
-              "filenamePattern": "*.xml"
-            },
-            {
-              "filenamePattern": "*.svg"
-            },
-            {
-              "filenamePattern": "*.svgx"
-            }
-          ]
+          {
+            "filenamePattern": "*.xml"
+          },
+          {
+            "filenamePattern": "*.svg"
+          },
+          {
+            "filenamePattern": "*.svgx"
+          }
+        ]
       }
     ]
   },

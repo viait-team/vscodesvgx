@@ -1,0 +1,36 @@
+
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+import * as vscode from 'vscode';
+import { DynamicXmlPreview } from './preview';
+
+export class XmlPreviewManager implements vscode.WebviewPanelSerializer {
+	private readonly _previews = new Map<string, DynamicXmlPreview>();
+
+	constructor(private readonly _context: vscode.ExtensionContext) { }
+
+	public openDynamicPreview(document: vscode.TextDocument, viewColumn: vscode.ViewColumn) {
+		let preview = this._previews.get(document.uri.toString());
+		if (preview) {
+			preview.show(document, viewColumn);
+		} else {
+			preview = new DynamicXmlPreview(this._context);
+			preview.show(document, viewColumn);
+			this._previews.set(document.uri.toString(), preview);
+		}
+	}
+
+	public getActivePreview(uri: vscode.Uri): DynamicXmlPreview | undefined {
+		return this._previews.get(uri.toString());
+	}
+
+	async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, _state: any): Promise<void> {
+		// This is not implemented since we are not persisting the preview across restarts.
+		// We can implement this in the future if needed.
+		webviewPanel.dispose();
+		return Promise.resolve();
+	}
+}

@@ -6,13 +6,33 @@
 import * as vscode from "vscode";
 import { VisualXmlSerializerNode } from "./serializer/VisualXmlSerializerNode";
 import { processWebviewMessage } from "./webviewMessageAdapter";
+import { XmlPreviewManager } from "./preview/previewManager";
+import { ShowXmlPreviewCommand } from "./commands/showPreview";
+import { OpenInBrowserCommand } from "./commands/openInBrowser";
 
 export function activate(extensionContext: vscode.ExtensionContext) {
+	const previewManager = new XmlPreviewManager(extensionContext);
+
 	extensionContext.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			"xml.visualEditor",
 			new VisualEditorProvider(extensionContext),
 		),
+	);
+
+	const showPreviewCommand = new ShowXmlPreviewCommand(previewManager);
+	extensionContext.subscriptions.push(
+		vscode.commands.registerCommand("xml.showPreview", () => showPreviewCommand.execute(false)),
+		vscode.commands.registerCommand("xml.showPreviewToSide", () => showPreviewCommand.execute(true)),
+	);
+
+	const openInBrowserCommand = new OpenInBrowserCommand(previewManager);
+	extensionContext.subscriptions.push(
+		vscode.commands.registerCommand("xml.openInBrowser", () => openInBrowserCommand.execute()),
+	);
+
+	extensionContext.subscriptions.push(
+		vscode.window.registerWebviewPanelSerializer("xml.preview", previewManager),
 	);
 }
 
