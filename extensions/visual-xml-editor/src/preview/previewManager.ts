@@ -27,7 +27,18 @@ export class XmlPreviewManager implements vscode.WebviewPanelSerializer {
 		return this._previews.get(uri.toString());
 	}
 
-	async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, _state: any): Promise<void> {
+	public getCurrentlyActiveWebviewPreview(): { uri: vscode.Uri; preview: DynamicXmlPreview } | undefined {
+		// Find the preview that corresponds to the currently active webview panel
+		for (const [uriString, preview] of this._previews) {
+			if (preview.activePreview && preview.activePreview.webviewPanel.active) {
+				return {
+					uri: vscode.Uri.parse(uriString),
+					preview: preview
+				};
+			}
+		}
+		return undefined;
+	} async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, _state: any): Promise<void> {
 		// This is not implemented since we are not persisting the preview across restarts.
 		// We can implement this in the future if needed.
 		webviewPanel.dispose();

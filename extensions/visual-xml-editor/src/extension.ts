@@ -28,7 +28,7 @@ export function activate(extensionContext: vscode.ExtensionContext) {
 
 	const openInBrowserCommand = new OpenInBrowserCommand(previewManager);
 	extensionContext.subscriptions.push(
-		vscode.commands.registerCommand("xml.openInBrowser", () => openInBrowserCommand.execute()),
+		vscode.commands.registerCommand("xml.openInBrowser", (args?: any) => openInBrowserCommand.execute(args)),
 	);
 
 	extensionContext.subscriptions.push(

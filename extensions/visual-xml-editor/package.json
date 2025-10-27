@@ -51,9 +51,11 @@
           "when": "activeCustomEditorId == 'xml.visualEditor'",
           "command": "xml.showPreviewToSide",
           "group": "navigation"
-        },
+        }
+      ],
+      "webview/context": [
         {
-          "when": "activeCustomEditorId == 'xml.visualEditor'",
+          "when": "webviewId == 'xml.preview'",
           "command": "xml.openInBrowser",
           "group": "navigation"
         }
