@@ -9,6 +9,11 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -119,80 +124,97 @@ export class XmlDocumentRenderer {
 	private async renderXmlPreview(xmlContent: string, _webview: vscode.Webview, documentUri: vscode.Uri): Promise<string> {
 		const nonce = this.getNonce();
 
-		// Check for XSLT transformation first
-		const xsltInfo = this.extractXsltReference(xmlContent);
-		if (xsltInfo) {
-			try {
-				const xslContent = await this.getXsltContent(xsltInfo, documentUri);
-				return this.createXsltTransformedPreview(xmlContent, xslContent, nonce);
-			} catch (error) {
-				console.error('XSLT transformation failed:', error);
-				// Fall back to displaying raw XML with error message
-				return this.createRawXmlPreview(xmlContent, nonce, `XSLT transformation failed: ${error}`);
+		// Wrap everything in comprehensive error handling
+		try {
+			// Basic XML validation first
+			if (!xmlContent || xmlContent.trim().length === 0) {
+				return this.createRawXmlPreview('<!-- Empty or invalid XML content -->', nonce, 'No content to preview');
 			}
-		}
 
-		// No XSLT, display raw XML
-		return this.createRawXmlPreview(xmlContent, nonce);
+			// Check for XSLT transformation
+			const xsltInfo = this.extractXsltReference(xmlContent);
+			if (xsltInfo) {
+				try {
+					const xslContent = await this.getXsltContent(xsltInfo, documentUri);
+					return this.createXsltTransformedPreview(xmlContent, xslContent, nonce);
+				} catch (xsltError) {
+					console.error('XSLT transformation failed:', xsltError);
+					// Fall back to displaying raw XML with error message instead of crashing
+					return this.createRawXmlPreview(xmlContent, nonce, `XSLT transformation failed: ${xsltError instanceof Error ? xsltError.message : String(xsltError)}`);
+				}
+			}
+
+			// No XSLT, display raw XML
+			return this.createRawXmlPreview(xmlContent, nonce);
+		} catch (error) {
+			// Ultimate fallback - should never crash the webview
+			console.error('Critical error in renderXmlPreview:', error);
+			return this.createEmergencyFallbackPreview(xmlContent, nonce);
+		}
 	}
 
 	private extractXsltReference(xmlContent: string): { type: 'external' | 'embedded'; href?: string; xslContent?: string } | null {
-		// Check for external XSLT stylesheet processing instruction (including data URIs)
-		// Handle multi-line processing instructions by using [\s\S] to match any character including newlines
-		const externalXslMatch = xmlContent.match(/<\?xml-stylesheet[\s\S]*?href\s*=\s*["']([^"']*(?:\n[^"']*)*)["'][\s\S]*?\?>/i);
-		if (externalXslMatch) {
-			let href = externalXslMatch[1];
+		try {
+			// Check for external XSLT stylesheet processing instruction (including data URIs)
+			// Handle multi-line processing instructions by using [\s\S] to match any character including newlines
+			const externalXslMatch = xmlContent.match(/<\?xml-stylesheet[\s\S]*?href\s*=\s*["']([^"']*(?:\n[^"']*)*)["'][\s\S]*?\?>/i);
+			if (externalXslMatch) {
+				let href = externalXslMatch[1];
 
-			// Clean up any newlines and whitespace in the href
-			href = href.replace(/\s+/g, '');
+				// Clean up any newlines and whitespace in the href
+				href = href.replace(/\s+/g, '');
 
-			// Check if it's a data URI with embedded XSLT
-			if (href.startsWith('data:text/xsl') || href.startsWith('data:application/xslt+xml')) {
-				// Extract the XSLT content from the data URI
-				const dataUriMatch = href.match(/data:[^,]*,(.+)/);
-				if (dataUriMatch) {
-					try {
-						// URL decode the content
-						const xslContent = decodeURIComponent(dataUriMatch[1]);
-						return {
-							type: 'embedded',
-							xslContent: xslContent
-						};
-					} catch (error) {
-						console.error('Failed to decode data URI:', error);
-						return null;
+				// Check if it's a data URI with embedded XSLT
+				if (href.startsWith('data:text/xsl') || href.startsWith('data:application/xslt+xml')) {
+					// Extract the XSLT content from the data URI
+					const dataUriMatch = href.match(/data:[^,]*,(.+)/);
+					if (dataUriMatch) {
+						try {
+							// URL decode the content
+							const xslContent = decodeURIComponent(dataUriMatch[1]);
+							return {
+								type: 'embedded',
+								xslContent: xslContent
+							};
+						} catch (error) {
+							console.error('Failed to decode data URI:', error);
+							return null;
+						}
 					}
+				} else {
+					// Regular external file reference
+					return {
+						type: 'external',
+						href: href
+					};
 				}
-			} else {
-				// Regular external file reference
+			}
+
+			// Check for embedded XSLT stylesheet element
+			const embeddedXslMatch = xmlContent.match(/<xsl:stylesheet[^>]*>[\s\S]*?<\/xsl:stylesheet>/i);
+			if (embeddedXslMatch) {
+				let xslContent = embeddedXslMatch[0];
+
+				// Ensure the XSLT has proper namespace declaration
+				if (!xslContent.includes('xmlns:xsl=')) {
+					// Add the XSLT namespace declaration
+					xslContent = xslContent.replace(
+						/<xsl:stylesheet([^>]*)>/i,
+						'<xsl:stylesheet$1 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
+					);
+				}
+
 				return {
-					type: 'external',
-					href: href
+					type: 'embedded',
+					xslContent: xslContent
 				};
 			}
+
+			return null;
+		} catch (error) {
+			console.error('Error extracting XSLT reference:', error);
+			return null;
 		}
-
-		// Check for embedded XSLT stylesheet element
-		const embeddedXslMatch = xmlContent.match(/<xsl:stylesheet[^>]*>[\s\S]*?<\/xsl:stylesheet>/i);
-		if (embeddedXslMatch) {
-			let xslContent = embeddedXslMatch[0];
-
-			// Ensure the XSLT has proper namespace declaration
-			if (!xslContent.includes('xmlns:xsl=')) {
-				// Add the XSLT namespace declaration
-				xslContent = xslContent.replace(
-					/<xsl:stylesheet([^>]*)>/i,
-					'<xsl:stylesheet$1 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
-				);
-			}
-
-			return {
-				type: 'embedded',
-				xslContent: xslContent
-			};
-		}
-
-		return null;
 	}
 
 	private async getXsltContent(xsltInfo: { type: 'external' | 'embedded'; href?: string; xslContent?: string }, documentUri?: vscode.Uri): Promise<string> {
@@ -332,6 +354,59 @@ export class XmlDocumentRenderer {
         }        // Perform transformation when page loads
         performXsltTransformation();
     </script>
+</body>
+</html>`;
+	}
+
+	private createEmergencyFallbackPreview(content: string, nonce: string): string {
+		const escapedContent = content
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+
+		return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Fallback Preview</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
+    <style nonce="${nonce}">
+        body {
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+            font-family: var(--vscode-editor-font-family);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .error-banner {
+            background-color: var(--vscode-inputValidation-errorBackground);
+            color: var(--vscode-errorForeground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .content {
+            white-space: pre-wrap;
+            font-family: var(--vscode-editor-font-family);
+            border: 1px solid var(--vscode-widget-border);
+            padding: 15px;
+            border-radius: 4px;
+            background-color: var(--vscode-input-background);
+            overflow: auto;
+            max-height: 80vh;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-banner">
+        ⚠️ Emergency Fallback Mode: The preview system encountered critical errors and has fallen back to safe mode. All transformation features are disabled to prevent system instability.
+    </div>
+    <div class="content">${escapedContent}</div>
 </body>
 </html>`;
 	}
