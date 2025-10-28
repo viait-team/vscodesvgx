@@ -1,18 +1,8 @@
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -29,12 +19,8 @@ export class XmlDocumentRenderer {
 		return await this.renderXmlPreview(fileContent, webview, document.uri);
 	}
 
-	private renderSvgPreview(svgContent: string, webview: vscode.Webview): string {
+	private renderSvgPreview(svgContent: string, _webview: vscode.Webview): string {
 		const nonce = this.getNonce();
-		const cspSource = webview.cspSource;
-
-		// Create a data URI for the SVG content
-		const svgDataUri = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgContent)))}`;
 
 		return `<!DOCTYPE html>
 <html lang="en">
@@ -43,7 +29,7 @@ export class XmlDocumentRenderer {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=0.1, user-scalable=yes">
     <title>SVG Preview</title>
 
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: ${cspSource}; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}';">
 
     <style nonce="${nonce}">
         html, body {
@@ -78,10 +64,9 @@ export class XmlDocumentRenderer {
             overflow: auto;
         }
 
-        .svg-image {
+        .svg-container svg {
             max-width: 100%;
             max-height: 100%;
-            object-fit: contain;
         }
 
         .error {
@@ -94,7 +79,7 @@ export class XmlDocumentRenderer {
 <body>
     <div class="container">
         <div class="svg-container">
-            <img class="svg-image" src="${svgDataUri}" alt="SVG Preview" />
+            ${svgContent}
         </div>
     </div>
 
@@ -267,12 +252,12 @@ export class XmlDocumentRenderer {
 		// Escape the XML and XSL content for safe embedding in JavaScript
 		const escapedXml = xmlContent
 			.replace(/\\/g, '\\\\')
-			.replace(/'/g, "\\'")
+			.replace(/'/g, '\\\'')
 			.replace(/\r?\n/g, '\\n');
 
 		const escapedXsl = xslContent
 			.replace(/\\/g, '\\\\')
-			.replace(/'/g, "\\'")
+			.replace(/'/g, '\\\'')
 			.replace(/\r?\n/g, '\\n');
 
 		return `<!DOCTYPE html>
