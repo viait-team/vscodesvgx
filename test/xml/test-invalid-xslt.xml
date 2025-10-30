@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="data:text/xsl,invalid%20xslt%20content%20here"?>
+<malformed-test>
+    <item>This XML contains invalid embedded XSLT in data URI</item>
+    <item>Should handle gracefully without system crash</item>
+</malformed-test>

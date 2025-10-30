@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simple elements to test attribute matching -->
+
+  <!-- Element with ID (should match easily) -->
+  <circle cx="100" cy="100" r="30" fill="red" id="red-circle"/>
+
+  <!-- Elements without ID (should match by key attributes) -->
+  <rect x="200" y="70" width="60" height="60" fill="blue"/>
+  <polygon points="320,70 350,130 290,130" fill="green"/>
+  <path d="M 50 200 Q 150 150 250 200" stroke="purple" stroke-width="3" fill="none"/>
+
+  <!-- Test instructions -->
+  <text x="200" y="280" text-anchor="middle" font-size="14" fill="black">
+    Simple attribute matching test
+  </text>
+</svg>

@@ -1,0 +1,5 @@
+This is not valid XML at all
+<unclosed-tag>
+&invalid-entity;
+<<>>
+No proper XML structure here...

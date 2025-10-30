@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sample XML with embedded XSLT for testing transformation -->
+<catalog>
+  <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    <xsl:template match="/">
+      <html>
+        <head>
+          <title>Embedded XSLT Example</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f8ff; }
+            h1 { color: #4169e1; text-align: center; }
+            .book-list { max-width: 600px; margin: 0 auto; }
+            .book-item {
+              background: white;
+              margin: 15px 0;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .book-title { font-size: 20px; font-weight: bold; color: #2e8b57; margin-bottom: 5px; }
+            .book-author { color: #4682b4; font-style: italic; }
+            .book-details { margin: 10px 0; font-size: 14px; }
+            .price { color: #dc143c; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Books Collection (Embedded XSLT)</h1>
+          <div class="book-list">
+            <xsl:for-each select="catalog/book">
+              <div class="book-item">
+                <div class="book-title"><xsl:value-of select="title"/></div>
+                <div class="book-author">Author: <xsl:value-of select="author"/></div>
+                <div class="book-details">
+                  Genre: <xsl:value-of select="genre"/> |
+                  Published: <xsl:value-of select="publish_date"/>
+                </div>
+                <div class="price">Price: $<xsl:value-of select="price"/></div>
+                <p><xsl:value-of select="description"/></p>
+              </div>
+            </xsl:for-each>
+          </div>
+        </body>
+      </html>
+    </xsl:template>
+  </xsl:stylesheet>
+
+  <book id="bk201">
+    <author>Johnson, Alice</author>
+    <title>Modern Web Development</title>
+    <genre>Technology</genre>
+    <price>49.99</price>
+    <publish_date>2023-01-15</publish_date>
+    <description>A comprehensive guide to building modern web applications using the latest technologies and best practices.</description>
+  </book>
+  <book id="bk202">
+    <author>Smith, Bob</author>
+    <title>The Art of Programming</title>
+    <genre>Computer Science</genre>
+    <price>59.95</price>
+    <publish_date>2023-03-20</publish_date>
+    <description>Exploring the creative and artistic aspects of software development.</description>
+  </book>
+</catalog>

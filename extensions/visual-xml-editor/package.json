@@ -11,9 +11,13 @@
     "onCommand:xml.showPreview"
   ],
   "main": "./out/extension.js",
+  "browser": "./media/webview.js",
   "scripts": {
-    "compile": "npx gulp compile-extension:visual-xml-editor && npx gulp --gulpfile ./gulpfile.copy-webview.js copy-webview",
-    "watch": "npx gulp watch-extension:visual-xml-editor"
+    "compile": "npx gulp compile-extension:visual-xml-editor && npm run compile:webview",
+    "watch": "npx gulp watch-extension:visual-xml-editor && npm run watch:webview",
+    "compile:webview": "node ./esbuild.mjs",
+    "watch:webview": "node ./esbuild.mjs --watch",
+    "build": "npm run compile"
   },
   "contributes": {
     "commands": [
@@ -110,13 +114,15 @@
   },
   "files": [
     "out/**",
-    "dist/**",
-    "webview/**",
+    "media/**",
     "package.json",
     "README.md"
   ],
   "devDependencies": {
+    "@types/d3": "^7.4.3",
     "@types/vscode": "^1.84.0",
+    "d3": "^7.9.0",
+    "esbuild": "^0.20.0",
     "fast-xml-parser": "^5.3.0",
     "typescript": "^5.3.2"
   }

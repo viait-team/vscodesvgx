@@ -8,5 +8,9 @@
 	"include": [
 		"src",
 		"../../src/vscode-dts/vscode.d.ts"
+	],
+	"exclude": [
+		"src/webview.ts",
+		"src/preview-webview.ts"
 	]
 }

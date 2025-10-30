@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sample 2: Complex document with namespaces, attributes and CDATA sections -->
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+  <channel>
+    <title>Example Feed</title>
+    <link>http://www.example.com/</link>
+    <description>Sample RSS feed for testing visual editor features</description>
+    <item guid="item-1" isPermaLink="false">
+      <title>Namespaced item</title>
+      <dc:creator>Jane Doe</dc:creator>
+      <description><![CDATA[This item contains <b>HTML-like</b> content inside CDATA.]]></description>
+      <meta published="2025-10-20" priority="high" />
+    </item>
+    <item guid="item-2" isPermaLink="false">
+      <title>Item with attributes</title>
+      <description>Plain text description</description>
+      <category domain="testing">unit</category>
+    </item>
+  </channel>
+</rss>

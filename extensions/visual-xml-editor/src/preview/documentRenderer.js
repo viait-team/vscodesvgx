@@ -2,47 +2,22 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
-
 import * as vscode from 'vscode';
 import * as path from 'path';
-
 export class XmlDocumentRenderer {
-	public async renderDocument(document: vscode.TextDocument, webview: vscode.Webview): Promise<string> {
-		const fileContent = document.getText();
-
-		if (document.fileName.toLowerCase().endsWith('.svg')) {
-			return this.renderSvgPreview(fileContent, webview);
-		}
-
-		// For XML and other files, return formatted XML content with potential XSLT transformation
-		return await this.renderXmlPreview(fileContent, webview, document.uri);
-	}
-
-	private extensionRootFromBuiltPath(builtPath: string): string {
-		const normalized = path.normalize(builtPath); // cleans separators
-		const parts = normalized.split(path.sep);
-		const outIndex = parts.indexOf('preview');
-		if (outIndex === -1) {
-			// no 'preview' segment — assume builtPath already is the extension root
-			return normalized;
-		}
-		const rootParts = parts.slice(0, outIndex); // everything before 'preview'
-		// On Windows the drive letter is preserved as first element like 'C:' so join works
-		return rootParts.join(path.sep);
-	}
-
-	private renderSvgPreview(svgContent: string, webview: vscode.Webview): string {
-		const nonce = this.getNonce();
-		const dirname = this.extensionRootFromBuiltPath(__dirname);
-		// Get the URI for our webview script
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
-			vscode.Uri.file(path.dirname(dirname)),
-			'media',
-			'preview-webview.js'
-		));
-
-		return `<!DOCTYPE html>
+    async renderDocument(document, webview) {
+        const fileContent = document.getText();
+        if (document.fileName.toLowerCase().endsWith('.svg')) {
+            return this.renderSvgPreview(fileContent, webview);
+        }
+        // For XML and other files, return formatted XML content with potential XSLT transformation
+        return await this.renderXmlPreview(fileContent, webview, document.uri);
+    }
+    renderSvgPreview(svgContent, webview) {
+        const nonce = this.getNonce();
+        // Get the URI for our webview script
+        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(vscode.Uri.file(path.dirname(__dirname)), 'webview', 'main.js'));
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -131,15 +106,6 @@ export class XmlDocumentRenderer {
         </div>
     </div>
 
-    <!-- Inject API with correct name for preview webview -->
-    <script nonce="${nonce}">
-        // Provide the VS Code API with the expected name for preview webview
-        // Only do this if we don't already have the preview API
-        if (typeof window.previewAcquireVsCodeApi === 'undefined') {
-            window.previewAcquireVsCodeApi = acquireVsCodeApi;
-        }
-    </script>
-
     <!-- Load our bundled webview script -->
     <script nonce="${nonce}" src="${scriptUri}"></script>
 
@@ -179,163 +145,145 @@ export class XmlDocumentRenderer {
     </script>
 </body>
 </html>`;
-	}
-
-	private async renderXmlPreview(xmlContent: string, _webview: vscode.Webview, documentUri: vscode.Uri): Promise<string> {
-		const nonce = this.getNonce();
-
-		// Wrap everything in comprehensive error handling
-		try {
-			// Basic XML validation first
-			if (!xmlContent || xmlContent.trim().length === 0) {
-				return this.createRawXmlPreview('<!-- Empty or invalid XML content -->', nonce, 'No content to preview');
-			}
-
-			// Check for XSLT transformation
-			const xsltInfo = this.extractXsltReference(xmlContent);
-			if (xsltInfo) {
-				try {
-					const xslContent = await this.getXsltContent(xsltInfo, documentUri);
-					return this.createXsltTransformedPreview(xmlContent, xslContent, nonce);
-				} catch (xsltError) {
-					console.error('XSLT transformation failed:', xsltError);
-					// Fall back to displaying raw XML with error message instead of crashing
-					return this.createRawXmlPreview(xmlContent, nonce, `XSLT transformation failed: ${xsltError instanceof Error ? xsltError.message : String(xsltError)}`);
-				}
-			}
-
-			// No XSLT, display raw XML
-			return this.createRawXmlPreview(xmlContent, nonce);
-		} catch (error) {
-			// Ultimate fallback - should never crash the webview
-			console.error('Critical error in renderXmlPreview:', error);
-			return this.createEmergencyFallbackPreview(xmlContent, nonce);
-		}
-	}
-
-	private extractXsltReference(xmlContent: string): { type: 'external' | 'embedded'; href?: string; xslContent?: string } | null {
-		try {
-			// Check for external XSLT stylesheet processing instruction (including data URIs)
-			// Handle multi-line processing instructions by using [\s\S] to match any character including newlines
-			const externalXslMatch = xmlContent.match(/<\?xml-stylesheet[\s\S]*?href\s*=\s*["']([^"']*(?:\n[^"']*)*)["'][\s\S]*?\?>/i);
-			if (externalXslMatch) {
-				let href = externalXslMatch[1];
-
-				// Clean up any newlines and whitespace in the href
-				href = href.replace(/\s+/g, '');
-
-				// Check if it's a data URI with embedded XSLT
-				if (href.startsWith('data:text/xsl') || href.startsWith('data:application/xslt+xml')) {
-					// Extract the XSLT content from the data URI
-					const dataUriMatch = href.match(/data:[^,]*,(.+)/);
-					if (dataUriMatch) {
-						try {
-							// URL decode the content
-							const xslContent = decodeURIComponent(dataUriMatch[1]);
-							return {
-								type: 'embedded',
-								xslContent: xslContent
-							};
-						} catch (error) {
-							console.error('Failed to decode data URI:', error);
-							return null;
-						}
-					}
-				} else {
-					// Regular external file reference
-					return {
-						type: 'external',
-						href: href
-					};
-				}
-			}
-
-			// Check for embedded XSLT stylesheet element
-			const embeddedXslMatch = xmlContent.match(/<xsl:stylesheet[^>]*>[\s\S]*?<\/xsl:stylesheet>/i);
-			if (embeddedXslMatch) {
-				let xslContent = embeddedXslMatch[0];
-
-				// Ensure the XSLT has proper namespace declaration
-				if (!xslContent.includes('xmlns:xsl=')) {
-					// Add the XSLT namespace declaration
-					xslContent = xslContent.replace(
-						/<xsl:stylesheet([^>]*)>/i,
-						'<xsl:stylesheet$1 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
-					);
-				}
-
-				return {
-					type: 'embedded',
-					xslContent: xslContent
-				};
-			}
-
-			return null;
-		} catch (error) {
-			console.error('Error extracting XSLT reference:', error);
-			return null;
-		}
-	}
-
-	private async getXsltContent(xsltInfo: { type: 'external' | 'embedded'; href?: string; xslContent?: string }, documentUri?: vscode.Uri): Promise<string> {
-		console.log('getXsltContent called with:', { type: xsltInfo.type, href: xsltInfo.href, hasXslContent: !!xsltInfo.xslContent, hasDocumentUri: !!documentUri });
-
-		if (xsltInfo.type === 'external' && xsltInfo.href) {
-			if (!documentUri) {
-				throw new Error('Document URI is required for external XSLT files');
-			}
-
-			// Read external XSLT file
-			const documentDir = path.dirname(documentUri.fsPath);
-			const xslPath = path.resolve(documentDir, xsltInfo.href);
-			const xslUri = vscode.Uri.file(xslPath);
-
-			console.log('Attempting to load external XSLT from:', xslPath);
-
-			try {
-				const xslDocument = await vscode.workspace.openTextDocument(xslUri);
-				const content = xslDocument.getText();
-				console.log('Successfully loaded XSLT content, length:', content.length);
-
-				// Check if it's XSLT 2.0 and warn (browsers only support 1.0)
-				if (content.includes('version="2.0"')) {
-					console.warn('XSLT 2.0 detected - browsers only support XSLT 1.0. Transformation may fail.');
-				}
-
-				return content;
-			} catch (error) {
-				throw new Error(`Failed to read XSLT file "${xsltInfo.href}": ${error}`);
-			}
-		} else if (xsltInfo.type === 'embedded' && xsltInfo.xslContent) {
-			return xsltInfo.xslContent;
-		} else {
-			throw new Error(`Invalid XSLT information provided. Type: ${xsltInfo.type}, has href: ${!!xsltInfo.href}, has xslContent: ${!!xsltInfo.xslContent}`);
-		}
-	}
-
-	private createXsltTransformedPreview(xmlContent: string, xslContent: string, nonce: string): string {
-		// Check if XSLT 2.0+ features are used
-		const isXslt20Plus = xslContent.includes('version="2.0"') ||
-			xslContent.includes('version="3.0"') ||
-			xslContent.includes('xmlns:xs=') ||
-			xslContent.includes('xmlns:fn=');
-
-		if (isXslt20Plus) {
-			return this.createXslt20WarningPreview(xmlContent, nonce);
-		}
-
-		// Escape the XML and XSL content for safe embedding in JavaScript
-		const escapedXml = xmlContent
-			.replace(/\\/g, '\\\\')
-			.replace(/'/g, '\\\'')
-			.replace(/\r?\n/g, '\\n');
-
-		const escapedXsl = xslContent
-			.replace(/\\/g, '\\\\')
-			.replace(/'/g, '\\\'')
-			.replace(/\r?\n/g, '\\n');
-
-		return `<!DOCTYPE html>
+    }
+    async renderXmlPreview(xmlContent, _webview, documentUri) {
+        const nonce = this.getNonce();
+        // Wrap everything in comprehensive error handling
+        try {
+            // Basic XML validation first
+            if (!xmlContent || xmlContent.trim().length === 0) {
+                return this.createRawXmlPreview('<!-- Empty or invalid XML content -->', nonce, 'No content to preview');
+            }
+            // Check for XSLT transformation
+            const xsltInfo = this.extractXsltReference(xmlContent);
+            if (xsltInfo) {
+                try {
+                    const xslContent = await this.getXsltContent(xsltInfo, documentUri);
+                    return this.createXsltTransformedPreview(xmlContent, xslContent, nonce);
+                }
+                catch (xsltError) {
+                    console.error('XSLT transformation failed:', xsltError);
+                    // Fall back to displaying raw XML with error message instead of crashing
+                    return this.createRawXmlPreview(xmlContent, nonce, `XSLT transformation failed: ${xsltError instanceof Error ? xsltError.message : String(xsltError)}`);
+                }
+            }
+            // No XSLT, display raw XML
+            return this.createRawXmlPreview(xmlContent, nonce);
+        }
+        catch (error) {
+            // Ultimate fallback - should never crash the webview
+            console.error('Critical error in renderXmlPreview:', error);
+            return this.createEmergencyFallbackPreview(xmlContent, nonce);
+        }
+    }
+    extractXsltReference(xmlContent) {
+        try {
+            // Check for external XSLT stylesheet processing instruction (including data URIs)
+            // Handle multi-line processing instructions by using [\s\S] to match any character including newlines
+            const externalXslMatch = xmlContent.match(/<\?xml-stylesheet[\s\S]*?href\s*=\s*["']([^"']*(?:\n[^"']*)*)["'][\s\S]*?\?>/i);
+            if (externalXslMatch) {
+                let href = externalXslMatch[1];
+                // Clean up any newlines and whitespace in the href
+                href = href.replace(/\s+/g, '');
+                // Check if it's a data URI with embedded XSLT
+                if (href.startsWith('data:text/xsl') || href.startsWith('data:application/xslt+xml')) {
+                    // Extract the XSLT content from the data URI
+                    const dataUriMatch = href.match(/data:[^,]*,(.+)/);
+                    if (dataUriMatch) {
+                        try {
+                            // URL decode the content
+                            const xslContent = decodeURIComponent(dataUriMatch[1]);
+                            return {
+                                type: 'embedded',
+                                xslContent: xslContent
+                            };
+                        }
+                        catch (error) {
+                            console.error('Failed to decode data URI:', error);
+                            return null;
+                        }
+                    }
+                }
+                else {
+                    // Regular external file reference
+                    return {
+                        type: 'external',
+                        href: href
+                    };
+                }
+            }
+            // Check for embedded XSLT stylesheet element
+            const embeddedXslMatch = xmlContent.match(/<xsl:stylesheet[^>]*>[\s\S]*?<\/xsl:stylesheet>/i);
+            if (embeddedXslMatch) {
+                let xslContent = embeddedXslMatch[0];
+                // Ensure the XSLT has proper namespace declaration
+                if (!xslContent.includes('xmlns:xsl=')) {
+                    // Add the XSLT namespace declaration
+                    xslContent = xslContent.replace(/<xsl:stylesheet([^>]*)>/i, '<xsl:stylesheet$1 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">');
+                }
+                return {
+                    type: 'embedded',
+                    xslContent: xslContent
+                };
+            }
+            return null;
+        }
+        catch (error) {
+            console.error('Error extracting XSLT reference:', error);
+            return null;
+        }
+    }
+    async getXsltContent(xsltInfo, documentUri) {
+        console.log('getXsltContent called with:', { type: xsltInfo.type, href: xsltInfo.href, hasXslContent: !!xsltInfo.xslContent, hasDocumentUri: !!documentUri });
+        if (xsltInfo.type === 'external' && xsltInfo.href) {
+            if (!documentUri) {
+                throw new Error('Document URI is required for external XSLT files');
+            }
+            // Read external XSLT file
+            const documentDir = path.dirname(documentUri.fsPath);
+            const xslPath = path.resolve(documentDir, xsltInfo.href);
+            const xslUri = vscode.Uri.file(xslPath);
+            console.log('Attempting to load external XSLT from:', xslPath);
+            try {
+                const xslDocument = await vscode.workspace.openTextDocument(xslUri);
+                const content = xslDocument.getText();
+                console.log('Successfully loaded XSLT content, length:', content.length);
+                // Check if it's XSLT 2.0 and warn (browsers only support 1.0)
+                if (content.includes('version="2.0"')) {
+                    console.warn('XSLT 2.0 detected - browsers only support XSLT 1.0. Transformation may fail.');
+                }
+                return content;
+            }
+            catch (error) {
+                throw new Error(`Failed to read XSLT file "${xsltInfo.href}": ${error}`);
+            }
+        }
+        else if (xsltInfo.type === 'embedded' && xsltInfo.xslContent) {
+            return xsltInfo.xslContent;
+        }
+        else {
+            throw new Error(`Invalid XSLT information provided. Type: ${xsltInfo.type}, has href: ${!!xsltInfo.href}, has xslContent: ${!!xsltInfo.xslContent}`);
+        }
+    }
+    createXsltTransformedPreview(xmlContent, xslContent, nonce) {
+        // Check if XSLT 2.0+ features are used
+        const isXslt20Plus = xslContent.includes('version="2.0"') ||
+            xslContent.includes('version="3.0"') ||
+            xslContent.includes('xmlns:xs=') ||
+            xslContent.includes('xmlns:fn=');
+        if (isXslt20Plus) {
+            return this.createXslt20WarningPreview(xmlContent, nonce);
+        }
+        // Escape the XML and XSL content for safe embedding in JavaScript
+        const escapedXml = xmlContent
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, '\\\'')
+            .replace(/\r?\n/g, '\\n');
+        const escapedXsl = xslContent
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, '\\\'')
+            .replace(/\r?\n/g, '\\n');
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -416,17 +364,15 @@ export class XmlDocumentRenderer {
     </script>
 </body>
 </html>`;
-	}
-
-	private createEmergencyFallbackPreview(content: string, nonce: string): string {
-		const escapedContent = content
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-
-		return `<!DOCTYPE html>
+    }
+    createEmergencyFallbackPreview(content, nonce) {
+        const escapedContent = content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -469,17 +415,15 @@ export class XmlDocumentRenderer {
     <div class="content">${escapedContent}</div>
 </body>
 </html>`;
-	}
-
-	private createXslt20WarningPreview(xmlContent: string, nonce: string): string {
-		const escapedXml = xmlContent
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-
-		return `<!DOCTYPE html>
+    }
+    createXslt20WarningPreview(xmlContent, nonce) {
+        const escapedXml = xmlContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -576,20 +520,17 @@ export class XmlDocumentRenderer {
     <div class="xml-content">${escapedXml}</div>
 </body>
 </html>`;
-	}
-
-	private createRawXmlPreview(xmlContent: string, nonce: string, errorMessage?: string): string {
-		// Escape HTML entities in XML content for safe display
-		const escapedXml = xmlContent
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-
-		const errorHtml = errorMessage ? `<div class="error">${errorMessage}</div>` : '';
-
-		return `<!DOCTYPE html>
+    }
+    createRawXmlPreview(xmlContent, nonce, errorMessage) {
+        // Escape HTML entities in XML content for safe display
+        const escapedXml = xmlContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        const errorHtml = errorMessage ? `<div class="error">${errorMessage}</div>` : '';
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -632,14 +573,13 @@ export class XmlDocumentRenderer {
     <div class="xml-content">${escapedXml}</div>
 </body>
 </html>`;
-	}
-
-	private getNonce(): string {
-		let text = '';
-		const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		for (let i = 0; i < 32; i++) {
-			text += possible.charAt(Math.floor(Math.random() * possible.length));
-		}
-		return text;
-	}
+    }
+    getNonce() {
+        let text = '';
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 32; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
 }

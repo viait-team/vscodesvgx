@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Test circle with ID for D3.js selection -->
+  <circle id="test-circle" cx="100" cy="100" r="50" fill="blue" stroke="black" stroke-width="2"/>
+
+  <!-- Test rectangle with ID -->
+  <rect id="test-rect" x="200" y="50" width="100" height="80" fill="green" stroke="red" stroke-width="1"/>
+
+  <!-- Test path with ID -->
+  <path id="test-path" d="M50 200 Q 150 120 250 200 T 350 200" stroke="purple" stroke-width="3" fill="none"/>
+
+  <!-- Test circle without ID (uses key attributes) -->
+  <circle cx="300" cy="120" r="30" fill="orange" stroke="brown" stroke-width="2"/>
+</svg>

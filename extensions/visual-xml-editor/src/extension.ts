@@ -16,7 +16,7 @@ export function activate(extensionContext: vscode.ExtensionContext) {
 	extensionContext.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			"xml.visualEditor",
-			new VisualEditorProvider(extensionContext),
+			new VisualEditorProvider(extensionContext, previewManager),
 		),
 	);
 
@@ -31,9 +31,105 @@ export function activate(extensionContext: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("xml.openInBrowser", (args?: any) => openInBrowserCommand.execute(args)),
 	);
 
+	// AUTOMATIC: Listen for editor selection changes and sync to preview automatically
+	extensionContext.subscriptions.push(
+		vscode.window.onDidChangeTextEditorSelection((event) => {
+			// Only sync for SVG/XML files
+			if (event.textEditor.document.languageId === 'xml' ||
+				event.textEditor.document.fileName.endsWith('.svg')) {
+				autoSyncEditorToPreview(previewManager, event.textEditor, event.selections[0]);
+			}
+		})
+	);
+
 	extensionContext.subscriptions.push(
 		vscode.window.registerWebviewPanelSerializer("xml.preview", previewManager),
 	);
+}
+
+// AUTOMATIC synchronization when editor selection changes
+function autoSyncEditorToPreview(previewManager: XmlPreviewManager, editor: vscode.TextEditor, selection: vscode.Selection) {
+	// Only proceed if there's an actual selection (not just cursor position)
+	if (selection.isEmpty) {
+		return;
+	}
+
+	const preview = previewManager.getActivePreview(editor.document.uri);
+	if (!preview?.activePreview) {
+		return; // No preview open, silently skip
+	}
+
+	// Get selected text
+	const selectedText = editor.document.getText(selection);
+	if (!selectedText.trim()) {
+		return;
+	}
+
+	// Parse the selected text to find SVG/XML elements
+	const elementInfo = parseSelectedElement(selectedText);
+	if (elementInfo) {
+		// Automatically flash the element in preview using D3.js
+		preview.activePreview.highlightElementInPreview(elementInfo);
+	}
+}
+
+function parseSelectedElement(selectedText: string): { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> } | null {
+	// Clean up the selected text
+	const cleanText = selectedText.trim();
+	if (!cleanText) {
+		return null;
+	}
+
+	// Match opening tag with attributes
+	const tagMatch = cleanText.match(/<(\w+)(\s[^>]*)?(?:\/>|>)/);
+	if (!tagMatch) {
+		return null;
+	}
+
+	const tagName = tagMatch[1];
+	const attributes = tagMatch[2] || '';
+
+	// Extract ID (most important)
+	const idMatch = attributes.match(/id\s*=\s*["']([^"']+)["']/);
+	const id = idMatch ? idMatch[1] : undefined;
+
+	// Extract class
+	const classMatch = attributes.match(/class\s*=\s*["']([^"']+)["']/);
+	const className = classMatch ? classMatch[1] : undefined;
+
+	// Extract key attributes for matching when no ID
+	const keyAttributes: Record<string, string> = {};
+	if (!id) {
+		// For common SVG elements, extract identifying attributes
+		switch (tagName.toLowerCase()) {
+			case 'circle':
+				extractAttribute(attributes, 'cx', keyAttributes);
+				extractAttribute(attributes, 'cy', keyAttributes);
+				extractAttribute(attributes, 'r', keyAttributes);
+				break;
+			case 'rect':
+				extractAttribute(attributes, 'x', keyAttributes);
+				extractAttribute(attributes, 'y', keyAttributes);
+				extractAttribute(attributes, 'width', keyAttributes);
+				extractAttribute(attributes, 'height', keyAttributes);
+				break;
+			case 'path':
+				extractAttribute(attributes, 'd', keyAttributes);
+				break;
+			case 'polygon':
+				extractAttribute(attributes, 'points', keyAttributes);
+				break;
+		}
+	}
+
+	return { tagName, id, className, keyAttributes };
+}
+
+function extractAttribute(attributes: string, attrName: string, keyAttributes: Record<string, string>): void {
+	const match = attributes.match(new RegExp(`${attrName}\\s*=\\s*["']([^"']+)["']`));
+	if (match) {
+		keyAttributes[attrName] = match[1];
+	}
 }
 
 interface WebviewMessage {
@@ -54,7 +150,7 @@ class VisualEditorProvider
 	public readonly onDidChangeCustomDocument =
 		this._onDidChangeCustomDocument.event;
 
-	constructor(private readonly context: vscode.ExtensionContext) { }
+	constructor(private readonly context: vscode.ExtensionContext, private readonly previewManager: XmlPreviewManager) { }
 
 	public openCustomDocument(uri: vscode.Uri): VisualXmlDocument {
 		return new VisualXmlDocument(uri);
@@ -151,6 +247,23 @@ class VisualEditorProvider
 							}
 							break;
 						}
+						case "syncToPreview": {
+							// Handle automatic sync from visual XML editor to preview
+							try {
+								const elementInfo = e.elementInfo;
+								if (elementInfo) {
+									// Find the preview for this document
+									const preview = this.previewManager.getActivePreview(document.uri);
+									if (preview?.activePreview) {
+										// Flash/highlight the element in preview
+										preview.activePreview.highlightElementInPreview(elementInfo);
+									}
+								}
+							} catch (err) {
+								console.error('syncToPreview failed', err);
+							}
+							break;
+						}
 						case "debug": {
 							try {
 								const text = 'webview: ' + (e.msg || JSON.stringify(e));
@@ -237,21 +350,12 @@ class VisualEditorProvider
 
 	private getHtmlForWebview(webview: vscode.Webview): string {
 		const scriptUri = webview.asWebviewUri(
-			vscode.Uri.joinPath(this.context.extensionUri, "webview", "main.js"),
+			vscode.Uri.joinPath(this.context.extensionUri, "media", "webview.js"),
 		);
 
 		const styleUri = webview.asWebviewUri(
-			vscode.Uri.joinPath(this.context.extensionUri, "webview", "style.css"),
+			vscode.Uri.joinPath(this.context.extensionUri, "media", "style.css"),
 		);
-
-		// Try to expose VS Code codicon styles from the product sources so webview can use exact icons
-		const codiconCssLocal = vscode.Uri.joinPath(this.context.extensionUri, '..', '..', 'src', 'vs', 'base', 'browser', 'ui', 'codicons', 'codicon', 'codicon.css');
-		let codiconUri: vscode.Uri | undefined = undefined;
-		try {
-			codiconUri = webview.asWebviewUri(codiconCssLocal);
-		} catch {
-			codiconUri = undefined;
-		}
 
 		return /* html */ `
             <!DOCTYPE html>
@@ -261,7 +365,6 @@ class VisualEditorProvider
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Visual XML Editor</title>
 				<link rel="stylesheet" href="${styleUri}">
-				${codiconUri ? `<link rel="stylesheet" href="${codiconUri}">` : ''}
             </head>
             <body>
                 <div id="root"></div>

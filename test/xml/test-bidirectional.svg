@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <!-- Background -->
+  <rect id="background" x="0" y="0" width="400" height="300" fill="#f0f8ff"/>
+
+  <!-- Interactive elements with IDs for testing -->
+  <circle id="red-circle" cx="100" cy="100" r="30" fill="red" stroke="darkred" stroke-width="2"/>
+  <rect id="blue-rectangle" x="200" y="50" width="60" height="40" fill="blue" stroke="darkblue" stroke-width="2"/>
+  <polygon id="green-triangle" points="150,200 120,250 180,250" fill="green" stroke="darkgreen" stroke-width="2"/>
+
+  <!-- Elements with classes -->
+  <circle class="yellow-shape" cx="300" cy="100" r="25" fill="yellow" stroke="orange" stroke-width="2"/>
+  <rect class="purple-shape" x="250" y="180" width="50" height="30" fill="purple" stroke="indigo" stroke-width="2"/>
+
+  <!-- Path element -->
+  <path id="curved-path" d="M 50 250 Q 150 200 250 250" stroke="black" stroke-width="3" fill="none"/>
+
+  <!-- Text element -->
+  <text id="sample-text" x="50" y="30" font-family="Arial" font-size="16" fill="black">Click any shape to test bi-directional sync!</text>
+</svg>

@@ -274,4 +274,29 @@ pre {
 /* compact toolbar button visuals for dark theme */
 .vxe-theme-dark .vxe-toolbtn { color: var(--vxe-fg); }
 
+/* SVG Element Highlighting - D3.js based */
+.is-flashing {
+    /* This class is applied during D3.js animation - styles are set via D3 */
+    transition: all 0.1s ease;
+}
+
+/* Selection highlighting for interactive preview */
+.svg-selected {
+    stroke: var(--vscode-focusBorder, #007ACC) !important;
+    stroke-width: 2px !important;
+    stroke-dasharray: 3,3 !important;
+    fill-opacity: 0.8 !important;
+}
+
+/* Visual feedback for hoverable elements */
+.svg-hoverable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.svg-hoverable:hover {
+    opacity: 0.8;
+    filter: brightness(1.1);
+}
+
 

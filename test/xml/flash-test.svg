@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simple test elements -->
+  <circle cx="50" cy="50" r="20" fill="red" id="test-circle"/>
+  <rect x="100" y="30" width="40" height="40" fill="blue" stroke="navy" stroke-width="2"/>
+  <polygon points="200,30 220,70 180,70" fill="green"/>
+</svg>
