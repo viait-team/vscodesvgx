@@ -200,6 +200,8 @@ class XmlPreview {
 	}
 
 	public highlightElementInPreview(elementInfo: { tagName: string; id?: string; className?: string }) {
+		console.log(`[5/8] Preview Manager: Received highlight request`);
+		console.log(`[6/8] Preview Manager: Sending highlight message to preview webview`);
 		// Send message to webview to highlight the element
 		this.sendMessageToWebview({
 			type: 'highlightElement',

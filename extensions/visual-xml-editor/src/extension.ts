@@ -249,9 +249,11 @@ class VisualEditorProvider
 						}
 						case "syncToPreview": {
 							// Handle automatic sync from visual XML editor to preview
+							console.log(`[3/8] Extension: Received highlight message from editor webview`);
 							try {
 								const elementInfo = e.elementInfo;
 								if (elementInfo) {
+									console.log(`[4/8] Extension: Forwarding highlight message to preview manager`);
 									// Find the preview for this document
 									const preview = this.previewManager.getActivePreview(document.uri);
 									if (preview?.activePreview) {

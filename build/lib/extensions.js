@@ -516,6 +516,7 @@ const esbuildMediaScripts = [
     'notebook-renderers/esbuild.mjs',
     'ipynb/esbuild.mjs',
     'simple-browser/esbuild-preview.mjs',
+    'visual-xml-editor/esbuild.mjs',
 ];
 async function webpackExtensions(taskName, isWatch, webpackConfigLocations) {
     const webpack = require('webpack');

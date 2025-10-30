@@ -13,17 +13,12 @@ const outDir = path.join(import.meta.dirname, 'media');
 run({
 	entryPoints: [
 		path.join(srcDir, 'webview.ts'),
-		path.join(srcDir, 'preview-webview.ts'),
+		path.join(srcDir, 'previewWebview.ts'),
 	],
 	srcDir,
 	outdir: outDir,
-	// Produce easy-to-use source maps for debugging in the webview/devtools
-	// Use "inline" during development so the map is embedded and DevTools picks up original TS directly
-	// Keep output readable by disabling minification and preserving names
-	sourcemap: 'inline',
-	minify: false,
-	bundle: true,
-	format: 'iife',
-	keepNames: true,
-	sourceRoot: '../../src',
+	additionalOptions: {
+		sourcemap: true,
+		sourceRoot: '../../src',
+	}
 }, process.argv);

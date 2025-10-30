@@ -306,6 +306,8 @@ function selectNode(node: Element, _containerEl?: HTMLElement): void {
 	try {
 		const elementInfo = extractElementInfo(node);
 		if (elementInfo) {
+			console.log(`[1/8] Editor: User clicked element ${elementInfo.id || elementInfo.tagName}`);
+			console.log(`[2/8] Editor: Sending highlight message to extension host`);
 			safePostMessage({
 				type: 'syncToPreview',
 				elementInfo: elementInfo

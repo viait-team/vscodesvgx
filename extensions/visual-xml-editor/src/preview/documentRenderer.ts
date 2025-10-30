@@ -39,7 +39,7 @@ export class XmlDocumentRenderer {
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
 			vscode.Uri.file(path.dirname(dirname)),
 			'media',
-			'preview-webview.js'
+			'previewWebview.js'
 		));
 
 		return `<!DOCTYPE html>

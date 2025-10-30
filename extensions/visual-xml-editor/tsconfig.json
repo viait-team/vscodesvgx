@@ -11,6 +11,6 @@
 	],
 	"exclude": [
 		"src/webview.ts",
-		"src/preview-webview.ts"
+		"src/previewWebview.ts"
 	]
 }

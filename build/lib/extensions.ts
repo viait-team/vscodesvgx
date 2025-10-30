@@ -566,6 +566,7 @@ const esbuildMediaScripts = [
 	'ipynb/esbuild.mjs',
 	'svgx/esbuild.mjs',
 	'simple-browser/esbuild-preview.mjs',
+	'visual-xml-editor/esbuild.mjs',
 ];
 
 export async function webpackExtensions(taskName: string, isWatch: boolean, webpackConfigLocations: { configPath: string; outputRoot?: string }[]) {
