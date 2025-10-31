@@ -157,6 +157,9 @@ function previewRenderRoot(xmlText: string, _twoPanel: boolean): void {
 
 	// Initialize D3.js for flashing animations
 	previewInitializeD3Enhancement();
+
+	// Setup click handlers for preview-to-editor sync
+	previewSetupClickHandlers();
 }
 
 // ============================================================================
@@ -192,7 +195,73 @@ function previewSetupD3Functionality(): void {
 	console.log('Preview D3.js functionality ready for flashing animations');
 }
 
-function previewFlashElement(elementSelector: string): void {
+function previewSetupClickHandlers(): void {
+	const container = document.getElementById('preview-svg-container');
+	if (!container) {
+		console.warn('Preview: SVG container not found for click handlers');
+		return;
+	}
+
+	container.addEventListener('click', (event) => {
+		const target = event.target as Element;
+		console.log('[1/8] Preview: Element clicked:', target.tagName);
+
+		if (!target) {
+			console.log('Preview: Extracting element info');
+			// Use the same extractElementInfo function as editor
+			const elementInfo = extractElementInfo(target);
+			if (elementInfo) {
+				console.log('[2/8] Preview: Sending syncToEditor message to extension host');
+				previewSafePostMessage({
+					type: 'syncToEditor',
+					elementInfo: elementInfo
+				});
+			}
+		}
+	});
+}
+
+function extractElementInfo(node: Element): { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> } | null {
+	if (!node) { return null; }
+
+	const tagName = node.nodeName;
+	const id = node.getAttribute('id') || undefined;
+	const className = node.getAttribute('class') || undefined;
+
+	// Extract key attributes for matching when no ID
+	const keyAttributes: Record<string, string> = {};
+	if (!id && node.attributes) {
+		// For common SVG elements, extract identifying attributes
+		switch (tagName.toLowerCase()) {
+			case 'circle':
+				addAttribute(node, 'cx', keyAttributes);
+				addAttribute(node, 'cy', keyAttributes);
+				addAttribute(node, 'r', keyAttributes);
+				break;
+			case 'rect':
+				addAttribute(node, 'x', keyAttributes);
+				addAttribute(node, 'y', keyAttributes);
+				addAttribute(node, 'width', keyAttributes);
+				addAttribute(node, 'height', keyAttributes);
+				break;
+			case 'path':
+				addAttribute(node, 'd', keyAttributes);
+				break;
+			case 'polygon':
+				addAttribute(node, 'points', keyAttributes);
+				break;
+		}
+	}
+
+	return { tagName, id, className, keyAttributes };
+}
+
+function addAttribute(node: Element, attrName: string, keyAttributes: Record<string, string>): void {
+	const value = node.getAttribute(attrName);
+	if (value) {
+		keyAttributes[attrName] = value;
+	}
+} function previewFlashElement(elementSelector: string): void {
 	const d3 = (window as any).d3;
 	if (typeof d3 === 'undefined') {
 		console.log(`[8/8] Preview: D3.js not available, cannot flash element`);
