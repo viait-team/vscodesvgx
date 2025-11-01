@@ -49,10 +49,10 @@ export class XmlDocumentRenderer {
 		<script>
 			// Initialize with SVG content when the module loads
 			window.addEventListener('DOMContentLoaded', () => {
-				console.log('[6/8] Preview: DOM loaded, will initialize with SVG content');
+				console.log('EP: [6/8] Preview: DOM loaded, will initialize with SVG content');
 				// Send init message directly to the window (the module listens for this)
 				setTimeout(() => {
-					console.log('[7/8] Preview: Dispatching init message with SVG content');
+					console.log('EP: [7/8] Preview: Dispatching init message with SVG content');
 					window.postMessage({
 						type: 'init',
 						content: ${svgContentJson},
@@ -72,7 +72,7 @@ export class XmlDocumentRenderer {
 
 	private async renderXmlPreview(xmlContent: string, _webview: vscode.Webview, _documentUri: vscode.Uri): Promise<string> {
 		const nonce = this.getNonce();
-		console.log('[5/8] DocumentRenderer.renderXmlPreview() - Processing XML content, length:', xmlContent.length);
+		console.log('EP: [5/8] DocumentRenderer.renderXmlPreview() - Processing XML content, length:', xmlContent.length);
 
 		const escapedContent = this.escapeHtml(xmlContent);
 		return `<!DOCTYPE html>

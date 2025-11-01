@@ -55,7 +55,7 @@ class XmlPreview {
 	private async handleWebviewMessage(message: any) {
 		switch (message.type) {
 			case 'syncToEditor':
-				console.log('[3/8] Extension Host: Received syncToEditor message from preview webview');
+				console.log('PE: [3/8] Extension Host: Received syncToEditor message from preview webview');
 				await this.handleSyncToEditor(message.data);
 				break;
 			case 'elementSelected':
@@ -81,7 +81,7 @@ class XmlPreview {
 			return;
 		}
 
-		console.log('[4/8] Extension Host: Forwarding message to editor webview');
+		console.log('PE: [4/8] Extension Host: Forwarding message to editor webview');
 		const editorWebviewPanel = this._editorProvider.getWebviewPanel(this._document.uri);
 		if (editorWebviewPanel) {
 			editorWebviewPanel.webview.postMessage({ type: 'selectInTree', data: elementInfo });
@@ -220,8 +220,8 @@ class XmlPreview {
 	}
 
 	public highlightElementInPreview(elementInfo: { tagName: string; id?: string; className?: string }) {
-		console.log(`[5/8] Preview Manager: Received highlight request`);
-		console.log(`[6/8] Preview Manager: Sending highlight message to preview webview`);
+		console.log(`EP: [5/8] Preview Manager: Received highlight request`);
+		console.log(`EP: [6/8] Preview Manager: Sending highlight message to preview webview`);
 		// Send message to webview to highlight the element
 		this.sendMessageToWebview({
 			type: 'highlightElement',

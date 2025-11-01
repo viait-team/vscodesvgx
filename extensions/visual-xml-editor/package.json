@@ -3,13 +3,10 @@
   "displayName": "Visual XML Editor",
   "description": "A visual editor for XML files.",
   "version": "0.0.1",
+  "publisher": "viait-team",
   "engines": {
     "vscode": "^1.84.0"
   },
-  "activationEvents": [
-    "onCustomEditor:xml.visualEditor",
-    "onCommand:xml.showPreview"
-  ],
   "main": "./out/extension.js",
   "browser": "./media/webview.js",
   "scripts": {

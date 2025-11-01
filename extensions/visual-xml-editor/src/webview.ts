@@ -71,14 +71,14 @@ window.addEventListener('message', (event: MessageEvent) => {
 			console.log('Editor webview received highlightElement message, ignoring');
 			break;
 		case 'selectInTree':
-			console.log('[5/8] Editor Webview: Received selectInTree message');
+			console.log('PE: [5/8] Editor Webview: Received selectInTree message');
 			selectElementInTree(message.data);
 			break;
 	}
 });
 
 function selectElementInTree(elementInfo: any) {
-	console.log('[6/8] Editor Webview: Finding element in tree');
+	console.log('PE: [6/8] Editor Webview: Finding element in tree');
 	if (!currentDoc) {
 		console.warn('selectElementInTree: currentDoc is null');
 		return;
@@ -120,9 +120,9 @@ function selectElementInTree(elementInfo: any) {
 
 
 	if (element) {
-		console.log('[7/8] Editor Webview: Element found, selecting node');
+		console.log('PE: [7/8] Editor Webview: Element found, selecting node');
 		selectNode(element);
-		console.log('[8/8] Editor Webview: Node selected');
+		console.log('PE: [8/8] Editor Webview: Node selected');
 	} else {
 		console.warn('selectElementInTree: Element not found for:', elementInfo);
 	}
@@ -371,8 +371,8 @@ function selectNode(node: Element, _containerEl?: HTMLElement): void {
 	try {
 		const elementInfo = extractElementInfo(node);
 		if (elementInfo) {
-			console.log(`[1/8] Editor: User clicked element ${elementInfo.id || elementInfo.tagName}`);
-			console.log(`[2/8] Editor: Sending highlight message to extension host`);
+			console.log(`EP: [1/8] Editor: User clicked element ${elementInfo.id || elementInfo.tagName}`);
+			console.log(`EP: [2/8] Editor: Sending highlight message to extension host`);
 			safePostMessage({
 				type: 'syncToPreview',
 				data: elementInfo

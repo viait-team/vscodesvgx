@@ -63,7 +63,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 			break;
 		case 'highlightElement':
 			// NEW: Handle highlight requests from extension for preview sync
-			console.log(`[7/8] Preview: Received highlight message`);
+			console.log(`EP: [7/8] Preview: Received highlight message`);
 			if (message.data && message.data.elementInfo) {
 				const selector = buildElementSelector(message.data.elementInfo);
 				console.log('Preview calling flashElement with selector:', selector);
@@ -204,14 +204,14 @@ function previewSetupClickHandlers(): void {
 
 	container.addEventListener('click', (event) => {
 		const target = event.target as Element;
-		console.log('[1/8] Preview: Element clicked:', target.tagName);
+		console.log('PE: [1/8] Preview: Element clicked:', target.tagName);
 
 		if (target) {
 			console.log('Preview: Extracting element info');
 			// Use the same extractElementInfo function as editor
 			const elementInfo = extractElementInfo(target);
 			if (elementInfo) {
-				console.log('[2/8] Preview: Sending syncToEditor message to extension host');
+				console.log('PE: [2/8] Preview: Sending syncToEditor message to extension host');
 				previewSafePostMessage({
 					type: 'syncToEditor',
 					data: elementInfo
@@ -264,12 +264,12 @@ function addAttribute(node: Element, attrName: string, keyAttributes: Record<str
 } function previewFlashElement(elementSelector: string): void {
 	const d3 = (window as any).d3;
 	if (typeof d3 === 'undefined') {
-		console.log(`[8/8] Preview: D3.js not available, cannot flash element`);
+		console.log(`EP: [8/8] Preview: D3.js not available, cannot flash element`);
 		previewShowStatus('D3.js flashing not available');
 		return;
 	}
 
-	console.log(`[8/8] Preview: Executing flash animation`);
+	console.log(`EP: [8/8] Preview: Executing flash animation`);
 	// Try to find element by various selectors
 	let element = d3.select(elementSelector);
 
