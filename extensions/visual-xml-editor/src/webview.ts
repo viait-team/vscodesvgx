@@ -78,54 +78,54 @@ window.addEventListener('message', (event: MessageEvent) => {
 });
 
 function selectElementInTree(elementInfo: any) {
-    console.log('[6/8] Editor Webview: Finding element in tree');
-    if (!currentDoc) {
-        console.warn('selectElementInTree: currentDoc is null');
-        return;
-    }
+	console.log('[6/8] Editor Webview: Finding element in tree');
+	if (!currentDoc) {
+		console.warn('selectElementInTree: currentDoc is null');
+		return;
+	}
 
-    let element: Element | null = null;
+	let element: Element | null = null;
 
-    if (elementInfo.id) {
-        // Direct comparison for ID
-        const allElements = currentDoc.getElementsByTagName('*');
-        for (let i = 0; i < allElements.length; i++) {
-            if (allElements[i].getAttribute('id') === elementInfo.id) {
-                element = allElements[i];
-                break;
-            }
-        }
-    } else if (elementInfo.keyAttributes) {
-        // Direct comparison for other key attributes
-        const allElements = currentDoc.getElementsByTagName(elementInfo.tagName);
-        for (let i = 0; i < allElements.length; i++) {
-            const currentElement = allElements[i];
-            let allMatch = true;
-            for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
-                if (currentElement.getAttribute(attr) !== value) {
-                    allMatch = false;
-                    break;
-                }
-            }
-            if (allMatch) {
-                element = currentElement;
-                break;
-            }
-        }
-    } else if (elementInfo.className) {
-        // querySelector for class name
-        const selector = `${elementInfo.tagName.toLowerCase()}.${elementInfo.className.trim().split(/\s+/).join('.')}`;
-        element = currentDoc.querySelector(selector);
-    }
+	if (elementInfo.id) {
+		// Direct comparison for ID
+		const allElements = currentDoc.getElementsByTagName('*');
+		for (let i = 0; i < allElements.length; i++) {
+			if (allElements[i].getAttribute('id') === elementInfo.id) {
+				element = allElements[i];
+				break;
+			}
+		}
+	} else if (elementInfo.keyAttributes) {
+		// Direct comparison for other key attributes
+		const allElements = currentDoc.getElementsByTagName(elementInfo.tagName);
+		for (let i = 0; i < allElements.length; i++) {
+			const currentElement = allElements[i];
+			let allMatch = true;
+			for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
+				if (currentElement.getAttribute(attr) !== value) {
+					allMatch = false;
+					break;
+				}
+			}
+			if (allMatch) {
+				element = currentElement;
+				break;
+			}
+		}
+	} else if (elementInfo.className) {
+		// querySelector for class name
+		const selector = `${elementInfo.tagName.toLowerCase()}.${elementInfo.className.trim().split(/\s+/).join('.')}`;
+		element = currentDoc.querySelector(selector);
+	}
 
 
-    if (element) {
-        console.log('[7/8] Editor Webview: Element found, selecting node');
-        selectNode(element);
-        console.log('[8/8] Editor Webview: Node selected');
-    } else {
-        console.warn('selectElementInTree: Element not found for:', elementInfo);
-    }
+	if (element) {
+		console.log('[7/8] Editor Webview: Element found, selecting node');
+		selectNode(element);
+		console.log('[8/8] Editor Webview: Node selected');
+	} else {
+		console.warn('selectElementInTree: Element not found for:', elementInfo);
+	}
 }
 
 let currentDoc: Document | null = null;
@@ -353,7 +353,17 @@ function selectNode(node: Element, _containerEl?: HTMLElement): void {
 	try {
 		// highlight header for the node
 		const headers = Array.from(document.querySelectorAll('.tree-node')).filter(n => (n as any).__vxe_node === node).map(n => n.querySelector('.tree-header'));
-		headers.forEach(h => { if (h) { h.classList.add('selected'); } });
+		headers.forEach(h => {
+			if (h) {
+				h.classList.add('selected');
+				// Scroll the selected element into view
+				h.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center',
+					inline: 'nearest'
+				});
+			}
+		});
 	} catch { }
 	renderAttributes(node);
 
@@ -365,7 +375,7 @@ function selectNode(node: Element, _containerEl?: HTMLElement): void {
 			console.log(`[2/8] Editor: Sending highlight message to extension host`);
 			safePostMessage({
 				type: 'syncToPreview',
-				elementInfo: elementInfo
+				data: elementInfo
 			});
 		}
 	} catch (e) {
