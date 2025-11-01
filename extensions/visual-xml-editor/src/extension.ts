@@ -12,11 +12,14 @@ import { OpenInBrowserCommand } from "./commands/openInBrowser";
 
 export function activate(extensionContext: vscode.ExtensionContext) {
 	const previewManager = new XmlPreviewManager(extensionContext);
+	const editorProvider = new VisualEditorProvider(extensionContext, previewManager);
+
+	previewManager.setEditorProvider(editorProvider);
 
 	extensionContext.subscriptions.push(
 		vscode.window.registerCustomEditorProvider(
 			"xml.visualEditor",
-			new VisualEditorProvider(extensionContext, previewManager),
+			editorProvider,
 		),
 	);
 
@@ -150,7 +153,13 @@ class VisualEditorProvider
 	public readonly onDidChangeCustomDocument =
 		this._onDidChangeCustomDocument.event;
 
+	private readonly webviewPanels = new Map<string, vscode.WebviewPanel>();
+
 	constructor(private readonly context: vscode.ExtensionContext, private readonly previewManager: XmlPreviewManager) { }
+
+	public getWebviewPanel(uri: vscode.Uri): vscode.WebviewPanel | undefined {
+		return this.webviewPanels.get(uri.toString());
+	}
 
 	public openCustomDocument(uri: vscode.Uri): VisualXmlDocument {
 		return new VisualXmlDocument(uri);
@@ -160,6 +169,11 @@ class VisualEditorProvider
 		document: VisualXmlDocument,
 		webviewPanel: vscode.WebviewPanel,
 	): void {
+		this.webviewPanels.set(document.uri.toString(), webviewPanel);
+		webviewPanel.onDidDispose(() => {
+			this.webviewPanels.delete(document.uri.toString());
+		});
+
 		webviewPanel.webview.options = {
 			enableScripts: true,
 		};

@@ -206,7 +206,7 @@ function previewSetupClickHandlers(): void {
 		const target = event.target as Element;
 		console.log('[1/8] Preview: Element clicked:', target.tagName);
 
-		if (!target) {
+		if (target) {
 			console.log('Preview: Extracting element info');
 			// Use the same extractElementInfo function as editor
 			const elementInfo = extractElementInfo(target);
@@ -214,7 +214,7 @@ function previewSetupClickHandlers(): void {
 				console.log('[2/8] Preview: Sending syncToEditor message to extension host');
 				previewSafePostMessage({
 					type: 'syncToEditor',
-					elementInfo: elementInfo
+					data: elementInfo
 				});
 			}
 		}

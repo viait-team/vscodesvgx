@@ -12,7 +12,7 @@ class XmlPreview {
 	private readonly _renderer: XmlDocumentRenderer;
 	private readonly _disposables: vscode.Disposable[] = [];
 
-	constructor(webviewPanel: vscode.WebviewPanel, document: vscode.TextDocument) {
+	constructor(webviewPanel: vscode.WebviewPanel, document: vscode.TextDocument, private readonly _editorProvider: any) {
 		this._webviewPanel = webviewPanel;
 		this._document = document;
 		this._renderer = new XmlDocumentRenderer();
@@ -54,6 +54,10 @@ class XmlPreview {
 
 	private async handleWebviewMessage(message: any) {
 		switch (message.type) {
+			case 'syncToEditor':
+				console.log('[3/8] Extension Host: Received syncToEditor message from preview webview');
+				await this.handleSyncToEditor(message.data);
+				break;
 			case 'elementSelected':
 				await this.handleElementSelection(message.selection);
 				break;
@@ -69,6 +73,20 @@ class XmlPreview {
 			case 'error':
 				this.handleWebviewError(message.data);
 				break;
+		}
+	}
+
+	private async handleSyncToEditor(elementInfo: any) {
+		if (!this._document) {
+			return;
+		}
+
+		console.log('[4/8] Extension Host: Forwarding message to editor webview');
+		const editorWebviewPanel = this._editorProvider.getWebviewPanel(this._document.uri);
+		if (editorWebviewPanel) {
+			editorWebviewPanel.webview.postMessage({ type: 'selectInTree', data: elementInfo });
+		} else {
+			console.warn('Could not find editor webview panel to sync to.');
 		}
 	}
 
@@ -116,6 +134,7 @@ class XmlPreview {
 	}
 
 	private async selectElementInEditor(editor: vscode.TextEditor, elementInfo: any) {
+		console.log('[4/8] Extension Host: Searching for element in document');
 		const text = this._document!.getText();
 
 		let pattern: RegExp;
@@ -140,6 +159,7 @@ class XmlPreview {
 
 		const match = pattern.exec(text);
 		if (match) {
+			console.log('[5/8] Extension Host: Element found, applying selection and revealing in editor');
 			const startPos = this._document!.positionAt(match.index);
 			const endPos = this._document!.positionAt(match.index + match[0].length);
 			const range = new vscode.Range(startPos, endPos);
@@ -231,7 +251,7 @@ export class DynamicXmlPreview {
 
 	private _preview: XmlPreview | undefined;
 
-	constructor(private readonly _context: vscode.ExtensionContext) { }
+	constructor(private readonly _context: vscode.ExtensionContext, private readonly _editorProvider: any) { }
 
 	public show(document: vscode.TextDocument, viewColumn: vscode.ViewColumn) {
 		if (this._preview) {
@@ -247,7 +267,7 @@ export class DynamicXmlPreview {
 				}
 			);
 
-			this._preview = new XmlPreview(webviewPanel, document);
+			this._preview = new XmlPreview(webviewPanel, document, this._editorProvider);
 		}
 
 		this._preview.update();

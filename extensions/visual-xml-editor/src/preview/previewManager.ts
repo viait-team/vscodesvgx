@@ -8,15 +8,20 @@ import { DynamicXmlPreview } from './preview';
 
 export class XmlPreviewManager implements vscode.WebviewPanelSerializer {
 	private readonly _previews = new Map<string, DynamicXmlPreview>();
+	private _editorProvider: any; // Type as any to avoid circular dependency
 
 	constructor(private readonly _context: vscode.ExtensionContext) { }
+
+	public setEditorProvider(editorProvider: any) {
+		this._editorProvider = editorProvider;
+	}
 
 	public openDynamicPreview(document: vscode.TextDocument, viewColumn: vscode.ViewColumn) {
 		let preview = this._previews.get(document.uri.toString());
 		if (preview) {
 			preview.show(document, viewColumn);
 		} else {
-			preview = new DynamicXmlPreview(this._context);
+			preview = new DynamicXmlPreview(this._context, this._editorProvider);
 			preview.show(document, viewColumn);
 			this._previews.set(document.uri.toString(), preview);
 		}
