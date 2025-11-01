@@ -41,6 +41,41 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 // Send ready message when the webview loads to request initial content
 document.addEventListener('DOMContentLoaded', () => {
+	// Add VS Code completion widget styles
+	const completionStyles = document.createElement('style');
+	completionStyles.textContent = `
+		.vscode-completion-widget {
+			font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace) !important;
+			font-size: var(--vscode-editor-font-size, 14px) !important;
+			line-height: 1.4 !important;
+		}
+
+		.completion-item {
+			transition: background-color 0.1s ease-in-out !important;
+		}
+
+		.completion-item:hover {
+			background-color: var(--vscode-editorSuggestWidget-selectedBackground, #094771) !important;
+			color: var(--vscode-editorSuggestWidget-selectedForeground, #ffffff) !important;
+		}
+
+		.attribute-value-input {
+			font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace) !important;
+			font-size: var(--vscode-editor-font-size, 14px) !important;
+			background: var(--vscode-input-background, #3c3c3c) !important;
+			color: var(--vscode-input-foreground, #cccccc) !important;
+			border: 1px solid var(--vscode-input-border, #454545) !important;
+			padding: 2px 4px !important;
+			border-radius: 2px !important;
+		}
+
+		.attribute-value-input:focus {
+			outline: 1px solid var(--vscode-focusBorder, #0078d4) !important;
+			outline-offset: -1px !important;
+		}
+	`;
+	document.head.appendChild(completionStyles);
+
 	safePostMessage({ type: 'ready' });
 });
 
@@ -447,7 +482,7 @@ function getInputValue(element: HTMLElement): string {
 	return '';
 }
 
-// Smart value input that provides suggestions based on attribute name
+// Smart value input with VS Code-style completion that triggers automatically on typing
 function createSmartValueInput(attributeName: string, currentValue: string, node: Element): HTMLElement {
 	const attrLower = attributeName.toLowerCase();
 
@@ -482,51 +517,200 @@ function createSmartValueInput(attributeName: string, currentValue: string, node
 
 	const options = attributeOptions[attrLower];
 
+	// Always create an input field (no more dropdowns!)
+	const input = document.createElement('input');
+	input.type = 'text';
+	input.value = currentValue;
+	input.className = 'attribute-value-input';
+
+	// Add change listener
+	input.addEventListener('change', () => {
+		node.setAttribute(attributeName, input.value);
+		postDocumentChange();
+	});
+
+	// Set up VS Code-style completion if we have options for this attribute
 	if (options) {
-		// Create a dropdown for attributes with predefined values
-		const select = document.createElement('select');
-		select.value = currentValue;
-
-		// Add current value if it's not in the predefined options
-		if (currentValue && !options.includes(currentValue)) {
-			const currentOption = document.createElement('option');
-			currentOption.value = currentValue;
-			currentOption.textContent = `${currentValue} (custom)`;
-			currentOption.selected = true;
-			select.appendChild(currentOption);
-		}
-
-		// Add all predefined options
-		options.forEach(option => {
-			const optionEl = document.createElement('option');
-			optionEl.value = option;
-			optionEl.textContent = option;
-			if (option === currentValue) {
-				optionEl.selected = true;
-			}
-			select.appendChild(optionEl);
-		});
-
-		// Handle value changes
-		select.addEventListener('change', () => {
-			node.setAttribute(attributeName, select.value);
-			postDocumentChange();
-		});
-
-		return select;
-	} else {
-		// Create a regular input for other attributes
-		const input = document.createElement('input');
-		input.value = currentValue;
-
-		// Add change listener
-		input.addEventListener('change', () => {
-			node.setAttribute(attributeName, input.value);
-			postDocumentChange();
-		});
-
-		return input;
+		setupVSCodeStyleCompletion(input, options);
 	}
+
+	return input;
+}
+
+/**
+ * Sets up VS Code-style completion that triggers automatically on typing
+ * This replicates the exact behavior of "font-family=" completion in CSS files
+ */
+function setupVSCodeStyleCompletion(input: HTMLInputElement, completionOptions: string[]): void {
+	let completionContainer: HTMLDivElement | null = null;
+	let selectedIndex = -1;
+	let filteredItems: string[] = [];
+
+	// Show completion suggestions
+	function showCompletions(value: string): void {
+		hideCompletions();
+
+		// Filter options based on current input
+		filteredItems = completionOptions.filter(option =>
+			option.toLowerCase().includes(value.toLowerCase())
+		);
+
+		if (filteredItems.length === 0) return;
+
+		// Create completion container
+		completionContainer = document.createElement('div');
+		completionContainer.className = 'vscode-completion-widget';
+		completionContainer.style.cssText = `
+			position: absolute;
+			background: var(--vscode-editorSuggestWidget-background, #252526);
+			border: 1px solid var(--vscode-editorSuggestWidget-border, #454545);
+			border-radius: 3px;
+			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+			max-height: 200px;
+			overflow-y: auto;
+			z-index: 1000;
+			font-family: var(--vscode-editor-font-family, 'Consolas, "Courier New", monospace');
+			font-size: var(--vscode-editor-font-size, 14px);
+			min-width: 200px;
+		`;
+
+		// Position the completion widget
+		const inputRect = input.getBoundingClientRect();
+		completionContainer.style.left = inputRect.left + 'px';
+		completionContainer.style.top = (inputRect.bottom + 2) + 'px';
+		completionContainer.style.minWidth = Math.max(inputRect.width, 200) + 'px';
+
+		// Add completion items
+		filteredItems.forEach((item, index) => {
+			const itemElement = document.createElement('div');
+			itemElement.className = 'completion-item';
+			itemElement.style.cssText = `
+				padding: 4px 8px;
+				cursor: pointer;
+				white-space: nowrap;
+				color: var(--vscode-editorSuggestWidget-foreground, #cccccc);
+			`;
+
+			// Highlight matching text
+			if (value) {
+				const regex = new RegExp(`(${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+				const highlighted = item.replace(regex, '<strong style="color: var(--vscode-editorSuggestWidget-highlightForeground, #0097fb);">$1</strong>');
+				itemElement.innerHTML = highlighted;
+			} else {
+				itemElement.textContent = item;
+			}
+
+			// Mouse events
+			itemElement.addEventListener('mouseenter', () => {
+				selectCompletionItem(index);
+			});
+
+			itemElement.addEventListener('click', () => {
+				applyCompletion(item);
+			});
+
+			completionContainer!.appendChild(itemElement);
+		});
+
+		document.body.appendChild(completionContainer);
+		selectedIndex = 0;
+		selectCompletionItem(0);
+	}
+
+	// Hide completion suggestions
+	function hideCompletions(): void {
+		if (completionContainer) {
+			document.body.removeChild(completionContainer);
+			completionContainer = null;
+		}
+		selectedIndex = -1;
+		filteredItems = [];
+	}
+
+	// Select completion item
+	function selectCompletionItem(index: number): void {
+		if (!completionContainer) return;
+
+		// Remove previous selection
+		const items = completionContainer.querySelectorAll('.completion-item');
+		items.forEach((item, i) => {
+			const element = item as HTMLElement;
+			if (i === index) {
+				element.style.backgroundColor = 'var(--vscode-editorSuggestWidget-selectedBackground, #094771)';
+				element.style.color = 'var(--vscode-editorSuggestWidget-selectedForeground, #ffffff)';
+			} else {
+				element.style.backgroundColor = 'transparent';
+				element.style.color = 'var(--vscode-editorSuggestWidget-foreground, #cccccc)';
+			}
+		});
+
+		selectedIndex = index;
+	}
+
+	// Apply selected completion
+	function applyCompletion(value: string): void {
+		input.value = value;
+		hideCompletions();
+		input.focus();
+		// Trigger change event
+		input.dispatchEvent(new Event('change', { bubbles: true }));
+	}
+
+	// Input event handler - triggers on every keystroke (this is the key!)
+	input.addEventListener('input', (e) => {
+		const value = input.value.trim();
+		if (value.length > 0) {
+			showCompletions(value);
+		} else {
+			hideCompletions();
+		}
+	});
+
+	// Focus event handler - show all options when focusing
+	input.addEventListener('focus', () => {
+		const value = input.value.trim();
+		showCompletions(value);
+	});
+
+	// Blur event handler - hide completions when losing focus
+	input.addEventListener('blur', (e) => {
+		// Delay hiding to allow click on completion items
+		setTimeout(() => {
+			hideCompletions();
+		}, 150);
+	});
+
+	// Keyboard navigation
+	input.addEventListener('keydown', (e) => {
+		if (!completionContainer || filteredItems.length === 0) return;
+
+		switch (e.key) {
+			case 'ArrowDown':
+				e.preventDefault();
+				selectedIndex = Math.min(selectedIndex + 1, filteredItems.length - 1);
+				selectCompletionItem(selectedIndex);
+				break;
+
+			case 'ArrowUp':
+				e.preventDefault();
+				selectedIndex = Math.max(selectedIndex - 1, 0);
+				selectCompletionItem(selectedIndex);
+				break;
+
+			case 'Enter':
+			case 'Tab':
+				e.preventDefault();
+				if (selectedIndex >= 0 && selectedIndex < filteredItems.length) {
+					applyCompletion(filteredItems[selectedIndex]);
+				}
+				break;
+
+			case 'Escape':
+				e.preventDefault();
+				hideCompletions();
+				break;
+		}
+	});
 }
 
 function renderAttributes(node: Element): void {
