@@ -437,6 +437,98 @@ function promptAddAttribute(node: Element): void {
 	});
 }
 
+// Helper function to get value from either input or select element
+function getInputValue(element: HTMLElement): string {
+	if (element instanceof HTMLInputElement) {
+		return element.value;
+	} else if (element instanceof HTMLSelectElement) {
+		return element.value;
+	}
+	return '';
+}
+
+// Smart value input that provides suggestions based on attribute name
+function createSmartValueInput(attributeName: string, currentValue: string, node: Element): HTMLElement {
+	const attrLower = attributeName.toLowerCase();
+
+	// Define attribute-specific value options
+	const attributeOptions: Record<string, string[]> = {
+		'font-family': [
+			'Arial', 'Helvetica', 'Times New Roman', 'Times', 'Georgia', 'Verdana',
+			'Courier New', 'Monaco', 'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'
+		],
+		'font-size': [
+			'8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px', '48px',
+			'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
+		],
+		'font-weight': [
+			'normal', 'bold', 'bolder', 'lighter',
+			'100', '200', '300', '400', '500', '600', '700', '800', '900'
+		],
+		'text-anchor': ['start', 'middle', 'end'],
+		'fill': [
+			'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink',
+			'brown', 'gray', 'black', 'white', 'cyan', 'magenta',
+			'none', 'transparent', 'currentColor'
+		],
+		'stroke': [
+			'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink',
+			'brown', 'gray', 'black', 'white', 'cyan', 'magenta',
+			'none', 'transparent', 'currentColor'
+		],
+		'stroke-linecap': ['butt', 'round', 'square'],
+		'stroke-linejoin': ['miter', 'round', 'bevel']
+	};
+
+	const options = attributeOptions[attrLower];
+
+	if (options) {
+		// Create a dropdown for attributes with predefined values
+		const select = document.createElement('select');
+		select.value = currentValue;
+
+		// Add current value if it's not in the predefined options
+		if (currentValue && !options.includes(currentValue)) {
+			const currentOption = document.createElement('option');
+			currentOption.value = currentValue;
+			currentOption.textContent = `${currentValue} (custom)`;
+			currentOption.selected = true;
+			select.appendChild(currentOption);
+		}
+
+		// Add all predefined options
+		options.forEach(option => {
+			const optionEl = document.createElement('option');
+			optionEl.value = option;
+			optionEl.textContent = option;
+			if (option === currentValue) {
+				optionEl.selected = true;
+			}
+			select.appendChild(optionEl);
+		});
+
+		// Handle value changes
+		select.addEventListener('change', () => {
+			node.setAttribute(attributeName, select.value);
+			postDocumentChange();
+		});
+
+		return select;
+	} else {
+		// Create a regular input for other attributes
+		const input = document.createElement('input');
+		input.value = currentValue;
+
+		// Add change listener
+		input.addEventListener('change', () => {
+			node.setAttribute(attributeName, input.value);
+			postDocumentChange();
+		});
+
+		return input;
+	}
+}
+
 function renderAttributes(node: Element): void {
 	const attrsContainer = document.getElementById('attributes-container');
 	if (!attrsContainer) { return; }
@@ -494,9 +586,8 @@ function renderAttributes(node: Element): void {
 			nameInput.className = 'attr-name';
 			nameInput.value = a.name;
 
-			const valInput = document.createElement('input');
+			const valInput = createSmartValueInput(a.name, a.value, node);
 			valInput.className = 'attr-value';
-			valInput.value = a.value;
 
 			const del = document.createElement('button');
 			del.className = 'attr-del';
@@ -509,7 +600,7 @@ function renderAttributes(node: Element): void {
 
 			nameInput.addEventListener('change', () => {
 				const newName = nameInput.value.trim();
-				const val = valInput.value;
+				const val = getInputValue(valInput);
 				if (newName && newName !== a.name) {
 					node.removeAttribute(a.name);
 					node.setAttribute(newName, val);
@@ -518,10 +609,7 @@ function renderAttributes(node: Element): void {
 				}
 			});
 
-			valInput.addEventListener('change', () => {
-				node.setAttribute(a.name, valInput.value);
-				postDocumentChange();
-			});
+			// Note: valInput already has its own change listener from createSmartValueInput
 
 			row.appendChild(nameInput);
 			row.appendChild(valInput);
@@ -534,14 +622,32 @@ function renderAttributes(node: Element): void {
 	addRow.className = 'attr-add-row';
 	const addName = document.createElement('input');
 	addName.placeholder = 'name';
-	const addVal = document.createElement('input');
-	addVal.placeholder = 'value';
+	let addVal = document.createElement('input') as HTMLElement;
+	if (addVal instanceof HTMLInputElement) {
+		addVal.placeholder = 'value';
+	}
+
+	// Update the value input when attribute name changes
+	addName.addEventListener('input', () => {
+		const newName = addName.value.trim();
+		if (newName) {
+			// Replace the value input with smart input based on attribute name
+			const newAddVal = createSmartValueInput(newName, '', node);
+			if (newAddVal instanceof HTMLInputElement) {
+				newAddVal.placeholder = 'value';
+			}
+			addRow.replaceChild(newAddVal, addVal);
+			addVal = newAddVal;
+		}
+	});
+
 	const addBtn = document.createElement('button');
 	addBtn.textContent = 'Add Attribute';
 	addBtn.addEventListener('click', () => {
 		const n = addName.value.trim();
 		if (!n) { showStatus('Name required'); return; }
-		node.setAttribute(n, addVal.value || '');
+		const v = getInputValue(addVal);
+		node.setAttribute(n, v || '');
 		renderAttributes(node);
 		postDocumentChange();
 	});
