@@ -16,11 +16,7 @@ declare const previewAcquireVsCodeApi: () => WebviewApi;
 const previewVscode = previewAcquireVsCodeApi();
 
 function previewSafePostMessage(msg: any): void {
-	try {
-		previewVscode.postMessage(msg);
-	} catch (e) {
-		console.warn('Failed to post message:', e);
-	}
+	previewVscode.postMessage(msg);
 }
 
 // Simple two-panel visual XML editor (left: tree, right: attributes)
@@ -121,7 +117,7 @@ function previewShowStatus(msg: string, timeout: number = 2500): void {
 		}
 		s.textContent = msg;
 		s.style.display = '';
-		setTimeout(() => { try { s!.style.display = 'none'; } catch { } }, timeout);
+		setTimeout(() => { s!.style.display = 'none'; }, timeout);
 	} catch (e) { /* ignore */ }
 }
 

@@ -17,31 +17,9 @@ interface WebviewApi {
 declare const acquireVsCodeApi: () => WebviewApi;
 const svgxVscode = acquireVsCodeApi();
 
-// Guard to avoid posting messages or running timers during unload/shutdown
-let svgxIsClosing = false;
 function svgxSafePostMessage(msg: any): void {
-	if (svgxIsClosing) { return; }
-	try {
-		// Post asynchronously to avoid illegal access when the host is tearing down.
-		setTimeout(() => {
-			if (svgxIsClosing) { return; }
-			try {
-				if (typeof svgxVscode === 'object' && typeof svgxVscode.postMessage === 'function') {
-					svgxVscode.postMessage(msg);
-				}
-			} catch (e) {
-				try { console.warn('postMessage failed (ignored):', e); } catch { }
-			}
-		}, 0);
-	} catch (e) {
-		try { console.warn('svgxSafePostMessage scheduling failed', e); } catch { }
-	}
+	svgxVscode.postMessage(msg);
 }
-
-window.addEventListener('beforeunload', () => { svgxIsClosing = true; });
-window.addEventListener('unload', () => { svgxIsClosing = true; });
-window.addEventListener('pagehide', () => { svgxIsClosing = true; });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { svgxIsClosing = true; } });
 
 // SVGX visual editor (following previewWebview.ts pattern)
 window.addEventListener('message', (event: MessageEvent) => {
@@ -98,7 +76,7 @@ function svgxShowStatus(msg: string, timeout: number = 2500): void {
 		}
 		s.textContent = msg;
 		s.style.display = '';
-		setTimeout(() => { try { s!.style.display = 'none'; } catch { } }, timeout);
+		setTimeout(() => { s!.style.display = 'none'; }, timeout);
 	} catch (e) { /* ignore */ }
 }
 

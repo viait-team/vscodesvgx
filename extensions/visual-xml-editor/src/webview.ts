@@ -14,11 +14,7 @@ declare const acquireVsCodeApi: () => WebviewApi;
 const vscode = acquireVsCodeApi();
 
 function safePostMessage(msg: any): void {
-	try {
-		vscode.postMessage(msg);
-	} catch (e) {
-		console.warn('Failed to post message:', e);
-	}
+	vscode.postMessage(msg);
 }
 
 // Send ready message when the webview loads to request initial content
@@ -215,7 +211,7 @@ function showStatus(msg: string, timeout: number = 2500): void {
 		}
 		s.textContent = msg;
 		s.style.display = '';
-		setTimeout(() => { try { s!.style.display = 'none'; } catch { } }, timeout);
+		setTimeout(() => { s!.style.display = 'none'; }, timeout);
 	} catch (e) { /* ignore */ }
 }
 
