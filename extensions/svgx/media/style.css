@@ -1,0 +1,256 @@
+/* SVGX Extension Styles */
+
+:root {
+	--vscode-font-family: var(--vscode-font-family);
+	--vscode-font-size: var(--vscode-font-size);
+	--vscode-font-weight: var(--vscode-font-weight);
+}
+
+body {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	font-weight: var(--vscode-font-weight);
+	color: var(--vscode-foreground);
+	background-color: var(--vscode-editor-background);
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+/* SVGX Notebook Container */
+.svgx-container {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	width: 100%;
+}
+
+/* Toolbar */
+.svgx-toolbar {
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+	background: var(--vscode-editor-background);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	gap: 8px;
+}
+
+.svgx-toolbar button {
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	padding: 6px 12px;
+	border-radius: 3px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.svgx-toolbar button:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+/* Cell Container */
+.svgx-cells {
+	flex: 1;
+	overflow-y: auto;
+	padding: 12px;
+}
+
+/* Individual Cell */
+.svgx-cell {
+	margin-bottom: 16px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+}
+
+.svgx-cell.selected {
+	border-color: var(--vscode-focusBorder);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+/* Cell Header */
+.svgx-cell-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	background: var(--vscode-editorGroupHeader-tabsBackground);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.svgx-cell-type {
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.svgx-cell-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.svgx-cell-action {
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 11px;
+}
+
+.svgx-cell-action:hover {
+	background: var(--vscode-toolbar-hoverBackground);
+	color: var(--vscode-foreground);
+}
+
+/* Cell Content */
+.svgx-cell-content {
+	padding: 12px;
+}
+
+/* Code Cell */
+.svgx-code-cell .svgx-cell-content {
+	padding: 0;
+}
+
+.svgx-code-editor {
+	min-height: 100px;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	background: var(--vscode-editor-background);
+	color: var(--vscode-editor-foreground);
+	border: none;
+	padding: 12px;
+	resize: vertical;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* SVG Cell */
+.svgx-svg-cell {
+	background: var(--vscode-editor-background);
+}
+
+.svgx-svg-content {
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	background: white;
+	padding: 16px;
+	margin: 8px 0;
+	text-align: center;
+}
+
+.svgx-svg-content svg {
+	max-width: 100%;
+	height: auto;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+}
+
+/* R Output Cell */
+.svgx-output-cell {
+	background: var(--vscode-editorWidget-background);
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.svgx-output-content {
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+	white-space: pre-wrap;
+	padding: 8px 12px;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+/* D3.js Integration */
+.svgx-d3-container {
+	background: white;
+	border-radius: 4px;
+	padding: 16px;
+	margin: 8px 0;
+}
+
+.svgx-d3-container svg {
+	width: 100%;
+	height: auto;
+}
+
+/* Interactive Elements */
+.svgx-interactive {
+	cursor: pointer;
+}
+
+.svgx-interactive:hover {
+	opacity: 0.8;
+}
+
+/* Status Bar */
+.svgx-status {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 12px;
+	background: var(--vscode-statusBar-background);
+	color: var(--vscode-statusBar-foreground);
+	font-size: 11px;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+/* Loading States */
+.svgx-loading {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.svgx-spinner {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--vscode-progressBar-background);
+	border-radius: 50%;
+	border-top-color: var(--vscode-button-background);
+	animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+	.svgx-toolbar {
+		flex-wrap: wrap;
+		padding: 6px;
+	}
+	
+	.svgx-cells {
+		padding: 8px;
+	}
+	
+	.svgx-cell {
+		margin-bottom: 12px;
+	}
+}
+
+/* Dark Theme Adjustments */
+.vscode-dark .svgx-svg-content {
+	background: #1e1e1e;
+	border-color: #3c3c3c;
+}
+
+.vscode-dark .svgx-d3-container {
+	background: #1e1e1e;
+}
+
+/* High Contrast Theme */
+.vscode-high-contrast .svgx-cell {
+	border-width: 2px;
+}
+
+.vscode-high-contrast .svgx-svg-content {
+	border-width: 2px;
+}
