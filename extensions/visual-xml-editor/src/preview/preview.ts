@@ -255,8 +255,15 @@ export class DynamicXmlPreview {
 
 	public show(document: vscode.TextDocument, viewColumn: vscode.ViewColumn) {
 		if (this._preview) {
-			this._preview.webviewPanel.reveal(viewColumn);
-		} else {
+			try {
+				this._preview.webviewPanel.reveal(viewColumn);
+			} catch (error) {
+				// Webview is disposed, clear the reference and create a new one
+				this._preview = undefined;
+			}
+		}
+
+		if (!this._preview) {
 			const webviewPanel = vscode.window.createWebviewPanel(
 				DynamicXmlPreview.viewType,
 				'XML Preview',
@@ -268,12 +275,15 @@ export class DynamicXmlPreview {
 			);
 
 			this._preview = new XmlPreview(webviewPanel, document, this._editorProvider);
+
+			// Clean up the reference when webview is disposed
+			webviewPanel.onDidDispose(() => {
+				this._preview = undefined;
+			});
 		}
 
 		this._preview.update();
-	}
-
-	public get activePreview(): XmlPreview | undefined {
+	} public get activePreview(): XmlPreview | undefined {
 		return this._preview;
 	}
 }

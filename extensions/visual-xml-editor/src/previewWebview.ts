@@ -3,6 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+declare const d3: any;
+
 // VS Code webview API
 interface WebviewApi {
 	postMessage(message: any): void;
@@ -13,31 +15,13 @@ interface WebviewApi {
 declare const previewAcquireVsCodeApi: () => WebviewApi;
 const previewVscode = previewAcquireVsCodeApi();
 
-// Guard to avoid posting messages or running timers during unload/shutdown
-let previewIsClosing = false;
 function previewSafePostMessage(msg: any): void {
-	if (previewIsClosing) { return; }
 	try {
-		// Post asynchronously to avoid illegal access when the host is tearing down.
-		setTimeout(() => {
-			if (previewIsClosing) { return; }
-			try {
-				if (typeof previewVscode === 'object' && typeof previewVscode.postMessage === 'function') {
-					previewVscode.postMessage(msg);
-				}
-			} catch (e) {
-				try { console.warn('postMessage failed (ignored):', e); } catch { }
-			}
-		}, 0);
+		previewVscode.postMessage(msg);
 	} catch (e) {
-		try { console.warn('previewSafePostMessage scheduling failed', e); } catch { }
+		console.warn('Failed to post message:', e);
 	}
 }
-
-window.addEventListener('beforeunload', () => { previewIsClosing = true; });
-window.addEventListener('unload', () => { previewIsClosing = true; });
-window.addEventListener('pagehide', () => { previewIsClosing = true; });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { previewIsClosing = true; } });
 
 // Simple two-panel visual XML editor (left: tree, right: attributes)
 window.addEventListener('message', (event: MessageEvent) => {
@@ -155,7 +139,7 @@ function previewRenderRoot(xmlText: string, _twoPanel: boolean): void {
 	container.innerHTML = xmlText;
 	root.appendChild(container);
 
-	// Initialize D3.js for flashing animations
+	// Initialize D3.js for flashing animations and zoom/pan
 	previewInitializeD3Enhancement();
 
 	// Setup click handlers for preview-to-editor sync
@@ -190,9 +174,30 @@ function previewInitializeD3Enhancement(): void {
 }
 
 function previewSetupD3Functionality(): void {
-	// No need to add event listeners here since we use the XML tree interface
-	// D3 will be used for flashing animations triggered from the tree context menu
-	console.log('Preview D3.js functionality ready for flashing animations');
+	console.log('Preview: previewSetupD3Functionality function called');
+
+	// Setup zoom/pan functionality
+	const rootContainer = d3.select('#root');
+	const svgContainer = rootContainer.select('#preview-svg-container');
+
+	if (svgContainer.empty()) {
+		console.warn('Preview: SVG container not found for zoom/pan');
+		return;
+	}
+
+	// Apply zoom/pan to the root div container, not the SVG itself
+	const zoom = d3.zoom()
+		.on('zoom', (event: any) => {
+			// Apply transform to the SVG container via CSS transform
+			svgContainer.style('transform',
+				`translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`);
+		});
+
+	// Attach zoom behavior to the root container
+	rootContainer.call(zoom);
+
+	console.log('Preview: D3.js zoom and pan enabled on container div');
+	console.log('Preview D3.js functionality ready for flashing animations and zoom/pan');
 }
 
 function previewSetupClickHandlers(): void {
@@ -261,7 +266,9 @@ function addAttribute(node: Element, attrName: string, keyAttributes: Record<str
 	if (value) {
 		keyAttributes[attrName] = value;
 	}
-} function previewFlashElement(elementSelector: string): void {
+}
+
+function previewFlashElement(elementSelector: string): void {
 	const d3 = (window as any).d3;
 	if (typeof d3 === 'undefined') {
 		console.log(`EP: [8/8] Preview: D3.js not available, cannot flash element`);

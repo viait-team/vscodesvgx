@@ -13,31 +13,13 @@ interface WebviewApi {
 declare const acquireVsCodeApi: () => WebviewApi;
 const vscode = acquireVsCodeApi();
 
-// Guard to avoid posting messages or running timers during unload/shutdown
-let isClosing = false;
 function safePostMessage(msg: any): void {
-	if (isClosing) { return; }
 	try {
-		// Post asynchronously to avoid illegal access when the host is tearing down.
-		setTimeout(() => {
-			if (isClosing) { return; }
-			try {
-				if (typeof vscode === 'object' && typeof vscode.postMessage === 'function') {
-					vscode.postMessage(msg);
-				}
-			} catch (e) {
-				try { console.warn('postMessage failed (ignored):', e); } catch { }
-			}
-		}, 0);
+		vscode.postMessage(msg);
 	} catch (e) {
-		try { console.warn('safePostMessage scheduling failed', e); } catch { }
+		console.warn('Failed to post message:', e);
 	}
 }
-
-window.addEventListener('beforeunload', () => { isClosing = true; });
-window.addEventListener('unload', () => { isClosing = true; });
-window.addEventListener('pagehide', () => { isClosing = true; });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { isClosing = true; } });
 
 // Send ready message when the webview loads to request initial content
 document.addEventListener('DOMContentLoaded', () => {
@@ -107,7 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 
 	safePostMessage({ type: 'ready' });
-});// Simple two-panel visual XML editor (left: tree, right: attributes)
+});
+
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	switch (message.type) {
@@ -602,7 +585,7 @@ function setupVSCodeStyleCompletion(input: HTMLInputElement, completionOptions: 
 			option.toLowerCase().includes(value.toLowerCase())
 		);
 
-		if (filteredItems.length === 0) return;
+		if (filteredItems.length === 0) { return; }
 
 		// Create completion container
 		completionContainer = document.createElement('div');
@@ -676,7 +659,7 @@ function setupVSCodeStyleCompletion(input: HTMLInputElement, completionOptions: 
 
 	// Select completion item
 	function selectCompletionItem(index: number): void {
-		if (!completionContainer) return;
+		if (!completionContainer) { return; }
 
 		// Remove previous selection
 		const items = completionContainer.querySelectorAll('.completion-item');
@@ -729,7 +712,7 @@ function setupVSCodeStyleCompletion(input: HTMLInputElement, completionOptions: 
 
 	// Keyboard navigation
 	input.addEventListener('keydown', (e) => {
-		if (!completionContainer || filteredItems.length === 0) return;
+		if (!completionContainer || filteredItems.length === 0) { return; }
 
 		switch (e.key) {
 			case 'ArrowDown':
@@ -1117,6 +1100,3 @@ function parseAttrInput(s: string): [string, string] {
 	}
 	return [k, v];
 }
-
-
-

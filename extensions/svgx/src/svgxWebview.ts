@@ -146,35 +146,30 @@ function svgxInitializeD3Enhancement(): void {
 
 function svgxSetupD3Functionality(): void {
 	console.log('SVGX: svgxSetupD3Functionality function called');
-	const svgContainer = d3.select('#root');
-	const svg = svgContainer.select('svg');
+	const rootContainer = d3.select('#root');
+	const svg = rootContainer.select('svg');
 
 	if (svg.empty()) {
 		console.warn('SVGX SVG element not found for D3 zoom/pan');
 		return;
 	}
 
-	// Wrap SVG content in a <g> tag for zooming
-	const g = svg.append('g');
-	const nodes = Array.from(svg.node()!.childNodes);
-	nodes.forEach((node) => {
-		if (node !== g.node()) {
-			g.node()!.appendChild(node);
-		}
-	});
-
+	// Apply zoom/pan to the root div container, not the SVG itself
 	const zoom = d3.zoom()
 		.on('zoom', (event: any) => {
-			g.attr('transform', event.transform);
+			// Apply transform to the SVG element via CSS transform
+			svg.style('transform',
+				`translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`);
 		});
 
-	svg.call(zoom);
+	// Attach zoom behavior to the root container
+	rootContainer.call(zoom);
 
-	console.log('SVGX D3.js zoom and pan enabled');
+	console.log('SVGX D3.js zoom and pan enabled on container div');
 	svgxShowStatus('SVGX Editor initialized with D3.js v' + d3.version);
 
-	// Re-run click handler setup on the new <g> element
-	svgxSetupClickHandlers(g);
+	// Setup click handlers on the original SVG (no wrapping needed)
+	svgxSetupClickHandlers(svg);
 }
 
 function svgxSetupClickHandlers(selection: any): void {
