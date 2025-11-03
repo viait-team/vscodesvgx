@@ -73,13 +73,41 @@ document.addEventListener('DOMContentLoaded', () => {
 			outline: 1px solid var(--vscode-focusBorder, #0078d4) !important;
 			outline-offset: -1px !important;
 		}
+
+		.save-button {
+			background: var(--vscode-button-background, #0e639c) !important;
+			color: var(--vscode-button-foreground, #ffffff) !important;
+			border: none !important;
+			padding: 4px 8px !important;
+			border-radius: 3px !important;
+			font-size: 12px !important;
+			cursor: pointer !important;
+			margin-left: 8px !important;
+		}
+
+		.save-button:hover {
+			background: var(--vscode-button-hoverBackground, #1177bb) !important;
+		}
+
+		.save-status {
+			font-size: 11px !important;
+			color: var(--vscode-descriptionForeground, #cccccc99) !important;
+			margin-left: 8px !important;
+		}
 	`;
 	document.head.appendChild(completionStyles);
 
-	safePostMessage({ type: 'ready' });
-});
+	// Add keyboard shortcuts
+	document.addEventListener('keydown', (e) => {
+		// Ctrl+S to save
+		if (e.ctrlKey && e.key === 's') {
+			e.preventDefault();
+			requestSave();
+		}
+	});
 
-// Simple two-panel visual XML editor (left: tree, right: attributes)
+	safePostMessage({ type: 'ready' });
+});// Simple two-panel visual XML editor (left: tree, right: attributes)
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	switch (message.type) {
@@ -90,6 +118,25 @@ window.addEventListener('message', (event: MessageEvent) => {
 				if (message.theme === 'dark') { document.documentElement.classList.add('vxe-theme-dark'); }
 				else { document.documentElement.classList.remove('vxe-theme-dark'); }
 			} catch { }
+			break;
+		case 'saveAck':
+			// Handle save acknowledgment from extension
+			if (message.status === 'ok') {
+				showSaveStatus('Saved');
+			} else {
+				showSaveStatus('Save failed: ' + (message.details || 'Unknown error'));
+			}
+			break;
+		case 'requestFullDocument':
+			// Extension is requesting the full document for save
+			try {
+				const serializer = new XMLSerializer();
+				const xml = serializer.serializeToString(currentDoc || document);
+				safePostMessage({ type: 'fullDocument', xml: xml });
+			} catch (e) {
+				console.error('Failed to send full document', e);
+				showSaveStatus('Save failed');
+			}
 			break;
 		case 'theme':
 			try {
@@ -718,10 +765,33 @@ function renderAttributes(node: Element): void {
 	if (!attrsContainer) { return; }
 	attrsContainer.innerHTML = '';
 
+	// Create header with save button
+	const headerContainer = document.createElement('div');
+	headerContainer.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;';
+
 	const h = document.createElement('div');
 	h.className = 'attrs-header';
 	h.textContent = node.nodeName;
-	attrsContainer.appendChild(h);
+	h.style.flex = '1';
+
+	const saveContainer = document.createElement('div');
+	saveContainer.style.cssText = 'display: flex; align-items: center;';
+
+	const saveBtn = document.createElement('button');
+	saveBtn.className = 'save-button';
+	saveBtn.textContent = 'Save';
+	saveBtn.title = 'Save changes (Ctrl+S)';
+	saveBtn.addEventListener('click', requestSave);
+
+	const saveStatus = document.createElement('span');
+	saveStatus.id = 'save-status';
+	saveStatus.className = 'save-status';
+
+	saveContainer.appendChild(saveBtn);
+	saveContainer.appendChild(saveStatus);
+	headerContainer.appendChild(h);
+	headerContainer.appendChild(saveContainer);
+	attrsContainer.appendChild(headerContainer);
 
 	// NEW: Add editable text content area
 	const textContentContainer = document.createElement('div');
@@ -848,7 +918,33 @@ function postDocumentChange(): void {
 		const serializer = new XMLSerializer();
 		const xml = serializer.serializeToString(currentDoc || document);
 		safePostMessage({ type: 'edit', content: xml });
+		showSaveStatus('Modified');
 	} catch (e) { console.error('postDocumentChange failed', e); }
+}
+
+function requestSave(): void {
+	try {
+		const serializer = new XMLSerializer();
+		const xml = serializer.serializeToString(currentDoc || document);
+		// Send a full document save request
+		safePostMessage({ type: 'fullDocument', xml: xml });
+		showSaveStatus('Saving...');
+	} catch (e) {
+		console.error('requestSave failed', e);
+		showSaveStatus('Save failed');
+	}
+}
+
+function showSaveStatus(message: string): void {
+	const statusEl = document.getElementById('save-status');
+	if (statusEl) {
+		statusEl.textContent = message;
+		if (message === 'Saved') {
+			setTimeout(() => {
+				statusEl.textContent = '';
+			}, 2000);
+		}
+	}
 }
 
 function promptAddChild(node: Element): void {

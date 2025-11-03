@@ -141,7 +141,28 @@ interface WebviewMessage {
 }
 
 class VisualXmlDocument implements vscode.CustomDocument {
+	private _content: string = '';
+	private _isDirty: boolean = false;
+
 	constructor(public readonly uri: vscode.Uri) { }
+
+	public get content(): string {
+		return this._content;
+	}
+
+	public setContent(content: string): void {
+		this._content = content;
+		this._isDirty = true;
+	}
+
+	public get isDirty(): boolean {
+		return this._isDirty;
+	}
+
+	public markSaved(): void {
+		this._isDirty = false;
+	}
+
 	dispose(): void { }
 }
 
@@ -306,7 +327,6 @@ class VisualEditorProvider
 		document: VisualXmlDocument,
 		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
-		// For now, delegate to saveAs which currently reads/writes the same content.
 		return this.saveCustomDocumentAs(document, document.uri, _cancellation);
 	}
 
@@ -315,20 +335,27 @@ class VisualEditorProvider
 		destination: vscode.Uri,
 		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
-		// This is a simplified save implementation. In a real-world scenario, you would
-		// get the content from the webview and save it to the file.
-		// For now, we'll just read the document and write it back to the new location.
-		// Read existing file, serialize via serializer and write to destination.
+		// Use the current content from the document if available, otherwise read from disk
 		const serializer = new VisualXmlSerializerNode(this.context);
 		return (async () => {
-			const data = await vscode.workspace.fs.readFile(document.uri);
-			const xml = new TextDecoder().decode(data);
-			const model = await serializer.deserialize(xml);
+			let content = document.content;
+
+			if (!content) {
+				// Fallback: read from disk if no content is stored
+				const data = await vscode.workspace.fs.readFile(document.uri);
+				content = new TextDecoder().decode(data);
+			}
+
+			// Serialize and save the content
+			const model = await serializer.deserialize(content);
 			const serialized = await serializer.serialize(model);
-			return vscode.workspace.fs.writeFile(
+			await vscode.workspace.fs.writeFile(
 				destination,
 				Buffer.from(serialized, 'utf8'),
 			);
+
+			// Mark document as saved
+			document.markSaved();
 		})();
 	}
 

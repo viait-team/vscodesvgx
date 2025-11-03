@@ -2,10 +2,9 @@
 	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
 		"outDir": "./out",
-		"lib": ["dom"]
+		"module": "commonjs",
+		"moduleResolution": "node",
 	},
-	"include": [
-		"src/**/*",
-		"../../src/vscode-dts/vscode.d.ts"
-	]
-}
+	  "include": [
+	    "src/**/*"
+	  ]}
