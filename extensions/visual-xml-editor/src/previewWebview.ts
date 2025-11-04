@@ -255,14 +255,26 @@ function extractElementInfo(node: Element): { tagName: string; id?: string; clas
 				addAttribute(node, 'points', keyAttributes);
 				break;
 			case 'text': {
-				// For text elements, use the text content as the key identifier
+				// For text elements, use the text content as the primary identifier
 				const textContent = node.textContent?.trim();
 				if (textContent) {
 					keyAttributes['text-content'] = textContent;
 				}
-				// Also include position attributes if available
+				// Always include position attributes - they'll be used only if disambiguation is needed
 				addAttribute(node, 'x', keyAttributes);
 				addAttribute(node, 'y', keyAttributes);
+				break;
+			}
+			default: {
+				// For elements not specifically handled, use element index among same-tag siblings
+				if (node.parentNode) {
+					const siblings = Array.from(node.parentNode.children)
+						.filter(child => child.tagName.toLowerCase() === tagName.toLowerCase());
+					const index = siblings.indexOf(node);
+					if (index >= 0) {
+						keyAttributes['element-index'] = index.toString();
+					}
+				}
 				break;
 			}
 		}
@@ -350,6 +362,24 @@ function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; 
 	}
 
 	// For non-text elements or text elements without content, use selector-based approach
+	// Special handling for elements with index-based identification
+	if (elementInfo.keyAttributes && elementInfo.keyAttributes['element-index']) {
+		const index = parseInt(elementInfo.keyAttributes['element-index']);
+		const tagName = elementInfo.tagName.toLowerCase();
+		const elements = document.querySelectorAll(tagName);
+
+		if (elements[index]) {
+			const element = d3.select(elements[index]);
+			previewAnimateFlash(element, `${tagName}[${index}]`);
+			return;
+		} else {
+			console.warn(`Preview element not found: ${tagName} at index ${index}`);
+			previewShowStatus(`Element not found: ${tagName}[${index}]`);
+			return;
+		}
+	}
+
+	// Fallback to selector-based approach for other elements
 	const selector = buildElementSelector(elementInfo);
 	previewFlashElement(selector);
 }

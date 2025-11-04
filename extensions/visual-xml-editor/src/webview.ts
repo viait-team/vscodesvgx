@@ -157,20 +157,62 @@ function selectElementInTree(elementInfo: any) {
 			}
 		}
 	} else if (elementInfo.keyAttributes) {
-		// Direct comparison for other key attributes
-		const allElements = currentDoc.getElementsByTagName(elementInfo.tagName);
-		for (let i = 0; i < allElements.length; i++) {
-			const currentElement = allElements[i];
-			let allMatch = true;
-			for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
-				if (currentElement.getAttribute(attr) !== value) {
-					allMatch = false;
-					break;
+		// Special handling for text elements with text-content
+		if (elementInfo.tagName.toLowerCase() === 'text' && elementInfo.keyAttributes['text-content']) {
+			const textContent = elementInfo.keyAttributes['text-content'];
+			const textElements = currentDoc.querySelectorAll('text');
+			const matchingElements: Element[] = [];
+
+			// Find all elements with matching text content
+			for (const textEl of textElements) {
+				if (textEl.textContent?.trim() === textContent) {
+					matchingElements.push(textEl);
 				}
 			}
-			if (allMatch) {
-				element = currentElement;
-				break;
+
+			if (matchingElements.length === 1) {
+				// Single match - use it
+				element = matchingElements[0];
+			} else if (matchingElements.length > 1) {
+				// Multiple matches - use x,y coordinates for disambiguation
+				const targetX = elementInfo.keyAttributes['x'];
+				const targetY = elementInfo.keyAttributes['y'];
+
+				if (targetX !== undefined && targetY !== undefined) {
+					for (const textEl of matchingElements) {
+						const x = textEl.getAttribute('x');
+						const y = textEl.getAttribute('y');
+						if (x === targetX && y === targetY) {
+							element = textEl;
+							break;
+						}
+					}
+				}
+
+				// Fallback to first match if coordinates don't help
+				if (!element) {
+					element = matchingElements[0];
+				}
+			}
+		} else {
+			// Direct comparison for other key attributes
+			const allElements = currentDoc.getElementsByTagName(elementInfo.tagName);
+			for (let i = 0; i < allElements.length; i++) {
+				const currentElement = allElements[i];
+				let allMatch = true;
+				for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
+					if (attr === 'text-content' || attr === 'element-index') {
+						continue; // Skip special attributes
+					}
+					if (currentElement.getAttribute(attr) !== value) {
+						allMatch = false;
+						break;
+					}
+				}
+				if (allMatch) {
+					element = currentElement;
+					break;
+				}
 			}
 		}
 	} else if (elementInfo.className) {
@@ -1076,6 +1118,18 @@ function extractElementInfo(node: Element): { tagName: string; id?: string; clas
 				// Always include position attributes - they'll be used only if disambiguation is needed
 				addAttribute(node, 'x', keyAttributes);
 				addAttribute(node, 'y', keyAttributes);
+				break;
+			}
+			default: {
+				// For elements not specifically handled, use element index among same-tag siblings
+				if (node.parentNode) {
+					const siblings = Array.from(node.parentNode.children)
+						.filter(child => child.tagName.toLowerCase() === tagName.toLowerCase());
+					const index = siblings.indexOf(node);
+					if (index >= 0) {
+						keyAttributes['element-index'] = index.toString();
+					}
+				}
 				break;
 			}
 		}
