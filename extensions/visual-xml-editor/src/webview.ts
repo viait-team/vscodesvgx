@@ -1067,6 +1067,17 @@ function extractElementInfo(node: Element): { tagName: string; id?: string; clas
 			case 'polygon':
 				addAttribute(node, 'points', keyAttributes);
 				break;
+			case 'text': {
+				// For text elements, use the text content as the primary identifier
+				const textContent = node.textContent?.trim();
+				if (textContent) {
+					keyAttributes['text-content'] = textContent;
+				}
+				// Always include position attributes - they'll be used only if disambiguation is needed
+				addAttribute(node, 'x', keyAttributes);
+				addAttribute(node, 'y', keyAttributes);
+				break;
+			}
 		}
 	}
 

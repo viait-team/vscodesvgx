@@ -45,9 +45,8 @@ window.addEventListener('message', (event: MessageEvent) => {
 			// NEW: Handle highlight requests from extension for preview sync
 			console.log(`EP: [7/8] Preview: Received highlight message`);
 			if (message.data && message.data.elementInfo) {
-				const selector = buildElementSelector(message.data.elementInfo);
-				console.log('Preview calling flashElement with selector:', selector);
-				previewFlashElement(selector);
+				console.log('Preview calling flashElementByInfo with elementInfo:', message.data.elementInfo);
+				previewFlashElementByInfo(message.data.elementInfo);
 			} else {
 				console.warn('preview highlightElement message missing data or elementInfo');
 			}
@@ -74,6 +73,10 @@ function buildElementSelector(elementInfo: { tagName: string; id?: string; class
 			// For path elements with d attribute, use exact match
 			if (attr === 'd' && value) {
 				attributeSelector += `[d="${value}"]`;
+			} else if (attr === 'text-content') {
+				// For text content, we'll handle this specially in the flash function
+				// Don't add to CSS selector, but keep it for text-based matching
+				continue;
 			} else {
 				attributeSelector += `[${attr}="${CSS.escape(value)}"]`;
 			}
@@ -251,6 +254,17 @@ function extractElementInfo(node: Element): { tagName: string; id?: string; clas
 			case 'polygon':
 				addAttribute(node, 'points', keyAttributes);
 				break;
+			case 'text': {
+				// For text elements, use the text content as the key identifier
+				const textContent = node.textContent?.trim();
+				if (textContent) {
+					keyAttributes['text-content'] = textContent;
+				}
+				// Also include position attributes if available
+				addAttribute(node, 'x', keyAttributes);
+				addAttribute(node, 'y', keyAttributes);
+				break;
+			}
 		}
 	}
 
@@ -262,6 +276,119 @@ function addAttribute(node: Element, attrName: string, keyAttributes: Record<str
 	if (value) {
 		keyAttributes[attrName] = value;
 	}
+}
+
+function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> }): void {
+	const d3 = (window as any).d3;
+	if (typeof d3 === 'undefined') {
+		console.log(`EP: [8/8] Preview: D3.js not available, cannot flash element`);
+		previewShowStatus('D3.js flashing not available');
+		return;
+	}
+
+	console.log(`EP: [8/8] Preview: Executing flash animation by elementInfo`);
+
+	// Special handling for text elements
+	if (elementInfo.tagName.toLowerCase() === 'text') {
+		console.log('Preview searching for text element with priority matching');
+
+		// Priority 1: ID-based matching (most reliable)
+		if (elementInfo.id) {
+			const element = d3.select('#' + CSS.escape(elementInfo.id));
+			if (!element.empty()) {
+				previewAnimateFlash(element, `text#${elementInfo.id}`);
+				return;
+			}
+		}
+
+		// Priority 2: Text content matching
+		if (elementInfo.keyAttributes && elementInfo.keyAttributes['text-content']) {
+			const textContent = elementInfo.keyAttributes['text-content'];
+			const textElements = document.querySelectorAll('text');
+			const matchingElements: Element[] = [];
+
+			// Find all elements with matching text content
+			for (const textEl of textElements) {
+				if (textEl.textContent?.trim() === textContent) {
+					matchingElements.push(textEl);
+				}
+			}
+
+			if (matchingElements.length === 1) {
+				// Single match - use it
+				const element = d3.select(matchingElements[0]);
+				previewAnimateFlash(element, `text:"${textContent}"`);
+				return;
+			} else if (matchingElements.length > 1) {
+				// Priority 3: Multiple matches - use x,y coordinates to distinguish
+				const targetX = elementInfo.keyAttributes['x'];
+				const targetY = elementInfo.keyAttributes['y'];
+
+				if (targetX !== undefined && targetY !== undefined) {
+					for (const textEl of matchingElements) {
+						const x = textEl.getAttribute('x');
+						const y = textEl.getAttribute('y');
+						if (x === targetX && y === targetY) {
+							const element = d3.select(textEl);
+							previewAnimateFlash(element, `text:"${textContent}" at (${targetX},${targetY})`);
+							return;
+						}
+					}
+				}
+
+				// Fallback: use first match if coordinates don't help
+				console.warn('Preview multiple text elements match, using first one');
+				const element = d3.select(matchingElements[0]);
+				previewAnimateFlash(element, `text:"${textContent}" (first of ${matchingElements.length} matches)`);
+				return;
+			}
+		}
+
+		console.warn('Preview text element not found with provided criteria');
+		previewShowStatus('Text element not found');
+		return;
+	}
+
+	// For non-text elements or text elements without content, use selector-based approach
+	const selector = buildElementSelector(elementInfo);
+	previewFlashElement(selector);
+}
+
+function previewAnimateFlash(element: any, description: string): void {
+	if (element.empty()) {
+		console.warn('Preview cannot flash empty element');
+		return;
+	}
+
+	console.log('Preview flashing element:', description);
+	previewShowStatus('Flashing element with D3.js: ' + description);
+
+	// Save original styles
+	const originalStroke = element.style('stroke');
+	const originalStrokeWidth = element.style('stroke-width');
+	const originalFillOpacity = element.style('fill-opacity');
+
+	// Create D3.js flashing animation
+	element.transition()
+		.duration(300)
+		.style('stroke', '#ff4757')
+		.style('stroke-width', '4px')
+		.style('fill-opacity', '0.7')
+		.transition()
+		.duration(300)
+		.style('stroke', '#ffa502')
+		.style('stroke-width', '6px')
+		.style('fill-opacity', '1.0')
+		.transition()
+		.duration(300)
+		.style('stroke', '#ff4757')
+		.style('stroke-width', '4px')
+		.style('fill-opacity', '0.7')
+		.transition()
+		.duration(300)
+		.style('stroke', originalStroke)
+		.style('stroke-width', originalStrokeWidth)
+		.style('fill-opacity', originalFillOpacity);
 }
 
 function previewFlashElement(elementSelector: string): void {
@@ -297,35 +424,7 @@ function previewFlashElement(elementSelector: string): void {
 		return;
 	}
 
-	console.log('Preview flashing element:', elementSelector);
-	previewShowStatus('Flashing element with D3.js: ' + elementSelector);
-
-	// Save original styles
-	const originalStroke = element.style('stroke');
-	const originalStrokeWidth = element.style('stroke-width');
-	const originalFillOpacity = element.style('fill-opacity');
-
-	// Create D3.js flashing animation
-	element.transition()
-		.duration(300)
-		.style('stroke', '#ff4757')
-		.style('stroke-width', '4px')
-		.style('fill-opacity', '0.7')
-		.transition()
-		.duration(300)
-		.style('stroke', '#ffa502')
-		.style('stroke-width', '6px')
-		.style('fill-opacity', '1.0')
-		.transition()
-		.duration(300)
-		.style('stroke', '#ff4757')
-		.style('stroke-width', '4px')
-		.style('fill-opacity', '0.7')
-		.transition()
-		.duration(300)
-		.style('stroke', originalStroke)
-		.style('stroke-width', originalStrokeWidth)
-		.style('fill-opacity', originalFillOpacity);
+	previewAnimateFlash(element, elementSelector);
 }
 
 function previewFlashElementByNode(xmlNode: Element): void {
