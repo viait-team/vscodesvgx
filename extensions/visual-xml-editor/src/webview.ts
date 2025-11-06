@@ -149,13 +149,7 @@ function selectElementInTree(elementInfo: any) {
 
 	if (elementInfo.id) {
 		// Direct comparison for ID
-		const allElements = currentDoc.getElementsByTagName('*');
-		for (let i = 0; i < allElements.length; i++) {
-			if (allElements[i].getAttribute('id') === elementInfo.id) {
-				element = allElements[i];
-				break;
-			}
-		}
+		element = currentDoc.getElementById(elementInfo.id);
 	} else if (elementInfo.keyAttributes) {
 		// Special handling for text elements with text-content
 		if (elementInfo.tagName.toLowerCase() === 'text' && elementInfo.keyAttributes['text-content']) {

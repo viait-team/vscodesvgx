@@ -62,6 +62,8 @@ function buildElementSelector(elementInfo: { tagName: string; id?: string; class
 	const baseSelector = elementInfo.tagName.toLowerCase();
 
 	// Strategy 1: ID-based (most reliable)
+	// CSS Select should never exectuted since CSS select id should not be used by a developer.
+	// Keep for completeness only in this function.
 	if (elementInfo.id) {
 		return `#${CSS.escape(elementInfo.id)}`;
 	}
@@ -302,6 +304,18 @@ function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; 
 
 	console.log(`EP: [8/8] Preview: Executing flash animation by elementInfo`);
 
+	// use id first if available
+	if (elementInfo.id) {
+		console.log(`Preview attempting to find element by ID: ${elementInfo.id}`);
+		const domElement = document.getElementById(elementInfo.id);
+
+		if (domElement) {
+			const element = d3.select(domElement);
+			previewAnimateFlash(element, `element#${elementInfo.id}`);
+			return;
+		}
+	}
+
 	// Special handling for text elements
 	if (elementInfo.tagName.toLowerCase() === 'text') {
 		console.log('Preview searching for text element with priority matching');
@@ -470,12 +484,12 @@ function previewFlashElementByNode(xmlNode: Element): void {
 	}
 
 	// For elements without ID, try to find by tag name (basic)
-	const tagName = xmlNode.nodeName;
+	/* const tagName = xmlNode.nodeName;
 	if (tagName) {
 		previewFlashElement(tagName);
 		previewShowStatus('Flashed first ' + tagName + ' element (no ID found)');
 		return;
-	}
+	}*/
 
 	previewShowStatus('Cannot flash element - no suitable selector found');
 }
