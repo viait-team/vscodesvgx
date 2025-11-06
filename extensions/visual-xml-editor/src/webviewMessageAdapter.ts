@@ -64,11 +64,7 @@ export async function processWebviewMessage(
 					document.setContent(xml);
 				}
 
-				const model = await serializer.deserialize(xml);
-				const serialized = await serializer.serialize(model);
-				const edit = new vscode.WorkspaceEdit();
-				edit.replace(document.uri, new vscode.Range(0, 0, 9999, 9999), serialized);
-				await vscode.workspace.applyEdit(edit);
+				await vscode.workspace.fs.writeFile(document.uri, Buffer.from(xml, 'utf8'));
 
 				// Mark document as saved
 				if (document.markSaved) {

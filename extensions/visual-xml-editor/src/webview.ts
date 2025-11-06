@@ -937,7 +937,12 @@ function renderAttributes(node: Element): void {
 function postDocumentChange(): void {
 	try {
 		const serializer = new XMLSerializer();
-		const xml = serializer.serializeToString(currentDoc || document);
+		if (!currentDoc) {
+			console.error('Cannot get content: currentDoc is null');
+			showSaveStatus('Error: Document not available');
+			return; // Stop execution
+		}
+		const xml = serializer.serializeToString(currentDoc);
 		safePostMessage({ type: 'edit', content: xml });
 		showSaveStatus('Modified');
 	} catch (e) { console.error('postDocumentChange failed', e); }
@@ -946,7 +951,12 @@ function postDocumentChange(): void {
 function requestSave(): void {
 	try {
 		const serializer = new XMLSerializer();
-		const xml = serializer.serializeToString(currentDoc || document);
+		if (!currentDoc) {
+			console.error('requestSave failed: currentDoc is null');
+			showSaveStatus('Save failed: Document not available');
+			return; // Stop execution
+		}
+		const xml = serializer.serializeToString(currentDoc);
 		// Send a full document save request
 		safePostMessage({ type: 'fullDocument', xml: xml });
 		showSaveStatus('Saving...');

@@ -16,11 +16,24 @@ if (parentPort) {
 	parentPort.on('message', (msg: Request) => {
 		try {
 			if (msg.action === 'deserialize') {
+				// Extract original XML declaration
+				const xmlDeclMatch = msg.content.match(/^\s*<\?xml[^?]*\?>/);
+				const originalXmlDecl = xmlDeclMatch ? xmlDeclMatch[0] : '';
+
+				// Remove XML declaration for parsing
+				const contentWithoutDecl = msg.content.replace(/^\s*<\?xml[^?]*\?>/, '').trim();
+
 				const parser = new XMLParser();
-				const jsonObj = parser.parse(msg.content);
+				const jsonObj = parser.parse(contentWithoutDecl);
 				const builder = new XMLBuilder({});
 				const newContent = builder.build(jsonObj);
-				const resp: Resp = { id: msg.id, result: { content: newContent } };
+
+				// Add correct XML declaration if missing, or restore original
+				const finalContent = originalXmlDecl
+					? originalXmlDecl + '\n' + newContent
+					: '<?xml version="1.0" encoding="UTF-8"?>\n' + newContent;
+
+				const resp: Resp = { id: msg.id, result: { content: finalContent } };
 				parentPort?.postMessage(resp);
 			} else if (msg.action === 'serialize') {
 				// Currently model is a thin wrapper around content; echo it back.

@@ -135,7 +135,9 @@ function previewRenderRoot(xmlText: string, _twoPanel: boolean): void {
 	// Simple container for SVG content display
 	const container = document.createElement('div');
 	container.id = 'preview-svg-container';
-	container.innerHTML = xmlText;
+
+	const displayContent = xmlText.trim().replace(/^\s*<\?xml[^?]*\?>/, '');
+	container.innerHTML = displayContent;
 	root.appendChild(container);
 
 	// Initialize D3.js for flashing animations and zoom/pan

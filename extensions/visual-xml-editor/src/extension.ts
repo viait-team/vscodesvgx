@@ -336,7 +336,7 @@ class VisualEditorProvider
 		_cancellation: vscode.CancellationToken,
 	): Thenable<void> {
 		// Use the current content from the document if available, otherwise read from disk
-		const serializer = new VisualXmlSerializerNode(this.context);
+		// const serializer = new VisualXmlSerializerNode(this.context);
 		return (async () => {
 			let content = document.content;
 
@@ -346,12 +346,10 @@ class VisualEditorProvider
 				content = new TextDecoder().decode(data);
 			}
 
-			// Serialize and save the content
-			const model = await serializer.deserialize(content);
-			const serialized = await serializer.serialize(model);
+			// Directly save the content from the document
 			await vscode.workspace.fs.writeFile(
 				destination,
-				Buffer.from(serialized, 'utf8'),
+				Buffer.from(content, 'utf8'),
 			);
 
 			// Mark document as saved

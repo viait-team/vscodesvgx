@@ -72,7 +72,7 @@ export class VisualXmlSerializerNode extends VisualXmlSerializerBase {
 		const { Worker } = await import('node:worker_threads');
 		const outputDir = this.getOutputDir();
 		// worker script is emitted next to extension main (out or dist)
-		const workerPath = vscode.Uri.joinPath(this.context?.extensionUri ?? vscode.Uri.file('.'), outputDir, 'xmlSerializerWorker.js').fsPath;
+		const workerPath = vscode.Uri.joinPath(this.context?.extensionUri ?? vscode.Uri.file('.'), outputDir, 'serializer', 'xmlSerializerWorker.js').fsPath;
 		this.worker = new Worker(workerPath, {});
 		this.worker.on('message', (msg: { id: string; result?: any; error?: string }) => {
 			const task = this.tasks.get(msg.id);
