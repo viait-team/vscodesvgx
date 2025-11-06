@@ -23,7 +23,7 @@ class XmlPreview {
 
 		vscode.workspace.onDidChangeTextDocument(e => {
 			if (e.document === this._document) {
-				this.update();
+				// this.update();
 			}
 		}, null, this._disposables);
 
