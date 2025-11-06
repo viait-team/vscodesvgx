@@ -57,52 +57,6 @@ window.addEventListener('message', (event: MessageEvent) => {
 let previewCurrentDoc: Document | null = null;
 let previewSelectedNode: Element | null = null;
 
-function buildElementSelector(elementInfo: { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> }): string {
-	const selectors: string[] = [];
-	const baseSelector = elementInfo.tagName.toLowerCase();
-
-	// Strategy 1: ID-based (most reliable)
-	// CSS Select should never exectuted since CSS select id should not be used by a developer.
-	// Keep for completeness only in this function.
-	if (elementInfo.id) {
-		return `#${CSS.escape(elementInfo.id)}`;
-	}
-
-	// Strategy 2: Key attributes for elements without ID
-	if (elementInfo.keyAttributes && Object.keys(elementInfo.keyAttributes).length > 0) {
-		let attributeSelector = baseSelector;
-		for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
-			// For path elements with d attribute, use exact match
-			if (attr === 'd' && value) {
-				attributeSelector += `[d="${value}"]`;
-			} else if (attr === 'text-content') {
-				// For text content, we'll handle this specially in the flash function
-				// Don't add to CSS selector, but keep it for text-based matching
-				continue;
-			} else {
-				attributeSelector += `[${attr}="${CSS.escape(value)}"]`;
-			}
-		}
-		selectors.push(attributeSelector);
-	}
-
-	// Strategy 3: Class-based
-	if (elementInfo.className) {
-		const classes = elementInfo.className.trim().split(/\s+/)
-			.filter(cls => cls.length > 0)
-			.map(cls => CSS.escape(cls));
-
-		if (classes.length > 0) {
-			selectors.push(`${baseSelector}.${classes.join('.')}`);
-		}
-	}
-
-	// Strategy 4: Tag name only (fallback)
-	selectors.push(baseSelector);
-
-	return selectors.join(', ');
-}
-
 function previewShowStatus(msg: string, timeout: number = 2500): void {
 	try {
 		let s = document.getElementById('preview-vxe-status');
@@ -294,42 +248,19 @@ function addAttribute(node: Element, attrName: string, keyAttributes: Record<str
 	}
 }
 
-function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> }): void {
-	const d3 = (window as any).d3;
-	if (typeof d3 === 'undefined') {
-		console.log(`EP: [8/8] Preview: D3.js not available, cannot flash element`);
-		previewShowStatus('D3.js flashing not available');
-		return;
-	}
+function findElementByElementInfo(elementInfo: { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> }): { element: Element | null, desc: string } {
+	if (!elementInfo) return { element: null, desc: 'no elementInfo' };
 
-	console.log(`EP: [8/8] Preview: Executing flash animation by elementInfo`);
-
-	// use id first if available
+	// Strategy 1: ID-based (most reliable)
 	if (elementInfo.id) {
-		console.log(`Preview attempting to find element by ID: ${elementInfo.id}`);
-		const domElement = document.getElementById(elementInfo.id);
-
-		if (domElement) {
-			const element = d3.select(domElement);
-			previewAnimateFlash(element, `element#${elementInfo.id}`);
-			return;
+		const element = document.getElementById(elementInfo.id);
+		if (element && element.tagName.toLowerCase() === elementInfo.tagName.toLowerCase()) {
+			return { element, desc: `element#${elementInfo.id}` };
 		}
 	}
 
-	// Special handling for text elements
+	// Strategy 2: Special handling for text elements
 	if (elementInfo.tagName.toLowerCase() === 'text') {
-		console.log('Preview searching for text element with priority matching');
-
-		// Priority 1: ID-based matching (most reliable)
-		if (elementInfo.id) {
-			const element = d3.select('#' + CSS.escape(elementInfo.id));
-			if (!element.empty()) {
-				previewAnimateFlash(element, `text#${elementInfo.id}`);
-				return;
-			}
-		}
-
-		// Priority 2: Text content matching
 		if (elementInfo.keyAttributes && elementInfo.keyAttributes['text-content']) {
 			const textContent = elementInfo.keyAttributes['text-content'];
 			const textElements = document.querySelectorAll('text');
@@ -343,12 +274,9 @@ function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; 
 			}
 
 			if (matchingElements.length === 1) {
-				// Single match - use it
-				const element = d3.select(matchingElements[0]);
-				previewAnimateFlash(element, `text:"${textContent}"`);
-				return;
+				return { element: matchingElements[0], desc: `text:"${textContent}"` };
 			} else if (matchingElements.length > 1) {
-				// Priority 3: Multiple matches - use x,y coordinates to distinguish
+				// Use x,y coordinates to distinguish
 				const targetX = elementInfo.keyAttributes['x'];
 				const targetY = elementInfo.keyAttributes['y'];
 
@@ -357,47 +285,87 @@ function previewFlashElementByInfo(elementInfo: { tagName: string; id?: string; 
 						const x = textEl.getAttribute('x');
 						const y = textEl.getAttribute('y');
 						if (x === targetX && y === targetY) {
-							const element = d3.select(textEl);
-							previewAnimateFlash(element, `text:"${textContent}" at (${targetX},${targetY})`);
-							return;
+							return { element: textEl, desc: `text:"${textContent}" at (${targetX},${targetY})` };
 						}
 					}
 				}
 
-				// Fallback: use first match if coordinates don't help
-				console.warn('Preview multiple text elements match, using first one');
-				const element = d3.select(matchingElements[0]);
-				previewAnimateFlash(element, `text:"${textContent}" (first of ${matchingElements.length} matches)`);
-				return;
+				// Fallback: use first match
+				return { element: matchingElements[0], desc: `text:"${textContent}" (first of ${matchingElements.length} matches)` };
 			}
 		}
-
-		console.warn('Preview text element not found with provided criteria');
-		previewShowStatus('Text element not found');
-		return;
+		return { element: null, desc: 'text element not found' };
 	}
 
-	// For non-text elements or text elements without content, use selector-based approach
-	// Special handling for elements with index-based identification
+	// Strategy 3: Index-based identification
 	if (elementInfo.keyAttributes && elementInfo.keyAttributes['element-index']) {
 		const index = parseInt(elementInfo.keyAttributes['element-index']);
 		const tagName = elementInfo.tagName.toLowerCase();
 		const elements = document.querySelectorAll(tagName);
 
 		if (elements[index]) {
-			const element = d3.select(elements[index]);
-			previewAnimateFlash(element, `${tagName}[${index}]`);
-			return;
-		} else {
-			console.warn(`Preview element not found: ${tagName} at index ${index}`);
-			previewShowStatus(`Element not found: ${tagName}[${index}]`);
-			return;
+			return { element: elements[index], desc: `${tagName}[${index}]` };
+		}
+		return { element: null, desc: `${tagName}[${index}] not found` };
+	}
+
+	// Strategy 4: Attribute-based CSS selector
+	if (elementInfo.keyAttributes && Object.keys(elementInfo.keyAttributes).length > 0) {
+		let attributeSelector = elementInfo.tagName.toLowerCase();
+		const attrs: string[] = [];
+		for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
+			if (attr === 'd' && value) {
+				attributeSelector += `[d="${value}"]`;
+				attrs.push(`d="${value}"`);
+			} else if (attr !== 'text-content') {
+				attributeSelector += `[${attr}="${CSS.escape(value)}"]`;
+				attrs.push(`${attr}="${value}"`);
+			}
+		}
+
+		const element = document.querySelector(attributeSelector);
+		if (element) {
+			return { element, desc: `${elementInfo.tagName.toLowerCase()}[${attrs.join('][')}]` };
 		}
 	}
 
-	// Fallback to selector-based approach for other elements
-	const selector = buildElementSelector(elementInfo);
-	previewFlashElement(selector);
+	// Strategy 5: Class-based selector
+	if (elementInfo.className) {
+		const classes = elementInfo.className.trim().split(/\s+/)
+			.filter(cls => cls.length > 0)
+			.map(cls => CSS.escape(cls));
+
+		if (classes.length > 0) {
+			const classSelector = `${elementInfo.tagName.toLowerCase()}.${classes.join('.')}`;
+			const element = document.querySelector(classSelector);
+			if (element) {
+				return { element, desc: classSelector };
+			}
+		}
+	}
+
+	// No strategy worked - element not found
+	return { element: null, desc: `${elementInfo.tagName} not found` };
+}
+
+function previewFlashElementByInfo(elementInfo: any): void {
+	const d3 = (window as any).d3;
+	if (typeof d3 === 'undefined') {
+		console.log(`EP: [8/8] Preview: D3.js not available, cannot flash element`);
+		previewShowStatus('D3.js flashing not available');
+		return;
+	}
+
+	console.log(`EP: [8/8] Preview: Executing flash animation by elementInfo`);
+
+	const result = findElementByElementInfo(elementInfo);
+	if (result.element) {
+		const element = d3.select(result.element);
+		previewAnimateFlash(element, result.desc);
+	} else {
+		console.warn('Preview element not found:', result.desc);
+		previewShowStatus('Element not found: ' + result.desc);
+	}
 }
 
 function previewAnimateFlash(element: any, description: string): void {
