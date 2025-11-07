@@ -273,6 +273,7 @@ class VisualEditorProvider
 
 						case "attributeChange": {
 							// TODONOW:Handle attributeChange messages from the webview
+							console.log(`AC: [3/8] Extension: Received Attribute Change message from editor webview`);
 
 
 							break;

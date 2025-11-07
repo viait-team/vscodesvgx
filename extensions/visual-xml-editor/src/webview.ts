@@ -599,6 +599,9 @@ function createSmartValueInput(attributeName: string, currentValue: string, node
 
 		// 3. Send the specific 'attributeChange' message for the live preview.
 		if (elementInfo) {
+			console.log(`AC: [1/8] Editor: attribute Changed ${elementInfo.id || attributeName}`);
+			console.log(`AC: [2/8] Editor: Sending attributeChange message to extension host`);
+
 			safePostMessage({
 				type: 'attributeChange',
 				elementInfo: elementInfo, // This correctly identifies the element by its OLD state.
