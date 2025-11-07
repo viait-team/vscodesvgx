@@ -587,8 +587,31 @@ function createSmartValueInput(attributeName: string, currentValue: string, node
 
 	// Add change listener
 	input.addEventListener('change', () => {
-		node.setAttribute(attributeName, input.value);
+
+		const newValue = input.value;
+
+		// 1. Capture the element's identifying info BEFORE changing the attribute.
+		const elementInfo = extractElementInfo(node);
+		const oldValue = node.getAttribute(attributeName) || '';
+
+		// 2. Apply the change to the editor's internal DOM.
+		node.setAttribute(attributeName, newValue);
+
+		// 3. Send the specific 'attributeChange' message for the live preview.
+		if (elementInfo) {
+			safePostMessage({
+				type: 'attributeChange',
+				elementInfo: elementInfo, // This correctly identifies the element by its OLD state.
+				attributeName: attributeName,
+				oldValue: oldValue,
+				newValue: newValue,
+				timestamp: Date.now()
+			});
+		}
+
+		// 4. Send the general 'edit' message for file persistence.
 		postDocumentChange();
+
 	});
 
 	// Set up VS Code-style completion if we have options for this attribute

@@ -270,6 +270,7 @@ export class DynamicXmlPreview {
 				viewColumn,
 				{
 					enableScripts: true,
+					retainContextWhenHidden: false, // 👈 disables caching of WebView context
 					localResourceRoots: [vscode.Uri.file(this._context.extensionPath)]
 				}
 			);

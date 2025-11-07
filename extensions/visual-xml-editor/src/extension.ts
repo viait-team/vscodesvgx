@@ -270,6 +270,14 @@ class VisualEditorProvider
 							}
 							break;
 						}
+
+						case "attributeChange": {
+							// TODONOW:Handle attributeChange messages from the webview
+
+
+							break;
+						}
+
 						case "edit":
 						case "incremental":
 						case "fullDocument":
