@@ -852,13 +852,37 @@ function renderAttributes(node: Element): void {
 
 	textContentInput.value = textNode ? textNode.nodeValue?.trim() || '' : '';
 	textContentInput.addEventListener('change', () => {
+
+		const newText = textContentInput.value;
+
+		// 1. Capture the state BEFORE the change.
+		const elementInfo = extractElementInfo(node);
+		const oldText = textNode ? textNode.nodeValue?.trim() || '' : '';
+
+		// 2. Apply the change to the editor's internal DOM.
 		if (textNode) {
-			textNode.nodeValue = textContentInput.value;
+			textNode.nodeValue = newText;
 		} else {
-			// If no text node exists, create one
-			node.appendChild(document.createTextNode(textContentInput.value));
+			// If no text node exists, create one.
+			textNode = document.createTextNode(newText);
+			node.appendChild(textNode);
 		}
+
+		// 3. Send a specific message for the text content change.
+		if (elementInfo) {
+			safePostMessage({
+				type: 'attributeChange',
+				elementInfo: elementInfo,
+				attributeName: 'textContent', // Use a special, non-attribute name.
+				oldValue: oldText,
+				newValue: newText,
+				timestamp: Date.now()
+			});
+		}
+
+		// 4. Send the full document for persistence.
 		postDocumentChange();
+
 	});
 	textContentContainer.appendChild(textContentInput);
 	attrsContainer.appendChild(textContentContainer);

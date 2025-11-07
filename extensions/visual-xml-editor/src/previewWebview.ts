@@ -480,17 +480,24 @@ function handleAttributeChange(message: any): void {
 
 		if (result.element) {
 
-			// 1. Update the attribute directly on the DOM element.
-			if (newValue === null) {
-				// A null value signifies that the attribute should be removed.
-				result.element.removeAttribute(attributeName);
-				console.log(`Preview: Successfully removed attribute "${attributeName}" from ${result.desc}`);
-				previewShowStatus(`Removed ${attributeName}`);
+			// Check if this is the special case for changing inner text.
+			if (attributeName === 'textContent') {
+				result.element.textContent = newValue;
+				console.log(`Preview: Successfully updated text content on ${result.desc}`);
+				previewShowStatus(`Updated text`);
 			} else {
-				// Set the new value for the attribute.
-				result.element.setAttribute(attributeName, newValue);
-				console.log(`Preview: Successfully updated attribute on ${result.desc} to ${attributeName}="${newValue}"`);
-				previewShowStatus(`Updated ${attributeName}="${newValue}"`);
+				// 1. Update the attribute directly on the DOM element.
+				if (newValue === null) {
+					// A null value signifies that the attribute should be removed.
+					result.element.removeAttribute(attributeName);
+					console.log(`Preview: Successfully removed attribute "${attributeName}" from ${result.desc}`);
+					previewShowStatus(`Removed ${attributeName}`);
+				} else {
+					// Set the new value for the attribute.
+					result.element.setAttribute(attributeName, newValue);
+					console.log(`Preview: Successfully updated attribute on ${result.desc} to ${attributeName}="${newValue}"`);
+					previewShowStatus(`Updated ${attributeName}="${newValue}"`);
+				}
 			}
 
 			// 2. Re-apply D3 enhancements to ensure interactivity is not lost.
