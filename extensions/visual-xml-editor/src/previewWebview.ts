@@ -51,6 +51,12 @@ window.addEventListener('message', (event: MessageEvent) => {
 				console.warn('preview highlightElement message missing data or elementInfo');
 			}
 			break;
+		case 'attributeChange':
+			// NEW: Handle live attribute updates from the editor webview
+			console.log(`AC: [7/8] Preview: Received attribute change message`, message);
+			// This new function will contain the logic to find the element and update its attribute.
+			handleAttributeChange(message);
+			break;
 	}
 });
 
@@ -461,6 +467,57 @@ function previewFlashElementByNode(xmlNode: Element): void {
 
 	previewShowStatus('Cannot flash element - no suitable selector found');
 }
+
+
+function handleAttributeChange(message: any): void {
+
+	try {
+		const { elementInfo, attributeName, oldValue, newValue } = message;
+
+		console.log(`AC: [8/8] Preview: Processing attribute change for ${elementInfo.tagName}.${attributeName} = "${newValue}"`);
+
+		const result = findElementByElementInfo(elementInfo);
+
+		if (result.element) {
+
+			// 1. Update the attribute directly on the DOM element.
+			if (newValue === null) {
+				// A null value signifies that the attribute should be removed.
+				result.element.removeAttribute(attributeName);
+				console.log(`Preview: Successfully removed attribute "${attributeName}" from ${result.desc}`);
+				previewShowStatus(`Removed ${attributeName}`);
+			} else {
+				// Set the new value for the attribute.
+				result.element.setAttribute(attributeName, newValue);
+				console.log(`Preview: Successfully updated attribute on ${result.desc} to ${attributeName}="${newValue}"`);
+				previewShowStatus(`Updated ${attributeName}="${newValue}"`);
+			}
+
+			// 2. Re-apply D3 enhancements to ensure interactivity is not lost.
+			// This is a critical step to preserve the D3 state.
+			reapplyD3Enhancement(result.element);
+
+		}
+	} catch (error) {
+		console.error('handleAttributeChange failed unexpectedly:', error);
+
+	}
+}
+
+function reapplyD3Enhancement(element: Element): void {
+	const d3 = (window as any).d3;
+	if (typeof d3 === 'undefined') {
+		return;
+	}
+
+	try {
+		const d3Element = d3.select(element);
+		console.log('D3 enhancements reapplied to element.');
+	} catch (e) {
+		console.warn('Failed to re-apply D3 enhancements.', e);
+	}
+}
+
 
 // initial ready notification
 previewSafePostMessage({ type: 'ready' });

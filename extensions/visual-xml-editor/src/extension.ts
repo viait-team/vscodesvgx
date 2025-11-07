@@ -272,10 +272,24 @@ class VisualEditorProvider
 						}
 
 						case "attributeChange": {
-							// TODONOW:Handle attributeChange messages from the webview
+							// Handle attributeChange messages from the editor webview and forward them to the preview webview.
 							console.log(`AC: [3/8] Extension: Received Attribute Change message from editor webview`);
+							try {
+								// Find the active preview panel associated with the current document.
+								const preview = this.previewManager.getActivePreview(document.uri);
 
-
+								// Check if the preview and its active panel exist.
+								if (preview?.activePreview) {
+									console.log(`AC: [4/8] Extension: Forwarding attribute change message to preview manager`);
+									// Forward the entire message object to the preview panel.
+									// The preview panel will have its own logic to handle this message.
+									preview.activePreview.sendAttributeUpdate(e);
+								} else {
+									console.warn('attributeChange: No active preview found for document URI:', document.uri.toString());
+								}
+							} catch (err) {
+								console.error('Failed to forward attributeChange message to preview:', err);
+							}
 							break;
 						}
 

@@ -231,6 +231,16 @@ class XmlPreview {
 		});
 	}
 
+	public sendAttributeUpdate(updateMessage: any) {
+		console.log(`AC: [5/8] Preview Manager: Received attribute change request`);
+		console.log(`AC: [6/8] Preview Manager: Forwarding 'attributeChange' message to preview webview`);
+
+		// The `updateMessage` object already has the correct structure, like { type: 'attributeChange', ... },
+		// as it was sent directly from the editor webview.
+		// We just need to forward this entire message object to the preview's webview.
+		this.sendMessageToWebview(updateMessage);
+	}
+
 	public selectElementInPreview(elementInfo: { tagName: string; id?: string; className?: string }) {
 		// Send message to webview to select the element
 		this.sendMessageToWebview({
