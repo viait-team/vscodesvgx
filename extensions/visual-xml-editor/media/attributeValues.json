@@ -1,39 +1,85 @@
 {
+  "clip-rule": [
+    "nonzero",
+    "evenodd",
+    "inherit"
+  ],
+  "display": [
+    "inline",
+    "block",
+    "list-item",
+    "none",
+    "inherit"
+  ],
+  "fill": [
+    "black",
+    "blue",
+    "currentColor",
+    "green",
+    "grey",
+    "none",
+    "red",
+    "transparent",
+    "white"
+  ],
+  "fill-rule": [
+    "nonzero",
+    "evenodd",
+    "inherit"
+  ],
   "font-family": [
     "Arial",
-    "Helvetica",
-    "Times New Roman",
-    "Times",
-    "Georgia",
-    "Verdana",
     "Courier New",
+    "Georgia",
+    "Helvetica",
     "Monaco",
-    "serif",
-    "sans-serif",
-    "monospace",
+    "Times",
+    "Times New Roman",
+    "Verdana",
     "cursive",
-    "fantasy"
+    "fantasy",
+    "monospace",
+    "sans-serif",
+    "serif"
   ],
   "font-size": [
-    "8px",
     "10px",
     "12px",
     "14px",
     "16px",
     "18px",
-    "20px",
     "24px",
-    "28px",
-    "32px",
-    "36px",
-    "48px",
-    "xx-small",
-    "x-small",
-    "small",
-    "medium",
     "large",
+    "larger",
+    "medium",
+    "small",
+    "smaller",
     "x-large",
-    "xx-large"
+    "x-small",
+    "xx-large",
+    "xx-small"
+  ],
+  "font-stretch": [
+    "normal",
+    "wider",
+    "narrower",
+    "ultra-condensed",
+    "extra-condensed",
+    "condensed",
+    "semi-condensed",
+    "semi-expanded",
+    "expanded",
+    "extra-expanded",
+    "ultra-expanded"
+  ],
+  "font-style": [
+    "normal",
+    "italic",
+    "oblique"
+  ],
+  "font-variant": [
+    "normal",
+    "small-caps"
   ],
   "font-weight": [
     "normal",
@@ -50,46 +96,35 @@
     "800",
     "900"
   ],
-  "text-anchor": [
-    "start",
-    "middle",
-    "end"
+  "image-rendering": [
+    "auto",
+    "optimizeSpeed",
+    "optimizeQuality"
   ],
-  "fill": [
-    "red",
-    "green",
-    "blue",
-    "yellow",
-    "orange",
-    "purple",
-    "pink",
-    "brown",
-    "gray",
-    "black",
-    "white",
-    "cyan",
-    "magenta",
-    "none",
-    "transparent",
-    "currentColor"
+  "shape-rendering": [
+    "auto",
+    "optimizeSpeed",
+    "crispEdges",
+    "geometricPrecision"
   ],
   "stroke": [
-    "red",
-    "green",
-    "blue",
-    "yellow",
-    "orange",
-    "purple",
-    "pink",
-    "brown",
-    "gray",
     "black",
-    "white",
-    "cyan",
-    "magenta",
+    "blue",
+    "currentColor",
+    "green",
+    "grey",
     "none",
+    "red",
     "transparent",
-    "currentColor"
+    "white"
+  ],
+  "stroke-dasharray": [
+    "none",
+    "2",
+    "4",
+    "5 5",
+    "10 5",
+    "2 4"
   ],
   "stroke-linecap": [
     "butt",
@@ -100,5 +135,41 @@
     "miter",
     "round",
     "bevel"
+  ],
+  "text-anchor": [
+    "start",
+    "middle",
+    "end"
+  ],
+  "text-decoration": [
+    "none",
+    "underline",
+    "overline",
+    "line-through"
+  ],
+  "text-rendering": [
+    "auto",
+    "optimizeSpeed",
+    "optimizeLegibility",
+    "geometricPrecision"
+  ],
+  "visibility": [
+    "visible",
+    "hidden",
+    "collapse"
+  ],
+  "writing-mode": [
+    "lr-tb",
+    "rl-tb",
+    "tb-rl",
+    "lr",
+    "rl",
+    "tb"
+  ],
+	"xmlns": [
+    "http://www.w3.org/2000/svg"
+  ],
+  "xmlns:xlink": [
+    "http://www.w3.org/1999/xlink"
   ]
 }
