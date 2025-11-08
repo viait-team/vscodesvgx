@@ -2,6 +2,10 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+// webview.ts
+
+// SMARTSENSE MODIFICATION: Add a global store for our local intellisense data.
+let attributeValueStore: Record<string, string[]> = {};
 
 // VS Code webview API
 interface WebviewApi {
@@ -90,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	switch (message.type) {
+		// SMARTSENSE MODIFICATION: Add a handler to receive the intellisense data from the extension.
+		case 'initIntellisense':
+			attributeValueStore = message.data;
+			break;
 		case 'init':
 			console.debug('vxe: init received. experimentalTwoPanel=', !!message.experimentalTwoPanel);
 			renderRoot(message.content, true);
@@ -548,36 +556,8 @@ function getInputValue(element: HTMLElement): string {
 function createSmartValueInput(attributeName: string, currentValue: string, node: Element): HTMLElement {
 	const attrLower = attributeName.toLowerCase();
 
-	// Define attribute-specific value options
-	const attributeOptions: Record<string, string[]> = {
-		'font-family': [
-			'Arial', 'Helvetica', 'Times New Roman', 'Times', 'Georgia', 'Verdana',
-			'Courier New', 'Monaco', 'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'
-		],
-		'font-size': [
-			'8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px', '48px',
-			'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-		],
-		'font-weight': [
-			'normal', 'bold', 'bolder', 'lighter',
-			'100', '200', '300', '400', '500', '600', '700', '800', '900'
-		],
-		'text-anchor': ['start', 'middle', 'end'],
-		'fill': [
-			'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink',
-			'brown', 'gray', 'black', 'white', 'cyan', 'magenta',
-			'none', 'transparent', 'currentColor'
-		],
-		'stroke': [
-			'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink',
-			'brown', 'gray', 'black', 'white', 'cyan', 'magenta',
-			'none', 'transparent', 'currentColor'
-		],
-		'stroke-linecap': ['butt', 'round', 'square'],
-		'stroke-linejoin': ['miter', 'round', 'bevel']
-	};
-
-	const options = attributeOptions[attrLower];
+	// SMARTSENSE MODIFICATION: Remove hard-coded object and use the new global store.
+	const options = attributeValueStore[attrLower];
 
 	// Always create an input field (no more dropdowns!)
 	const input = document.createElement('input');
@@ -1129,7 +1109,6 @@ function showInputDialog(title: string, labels: string[], callback: (vals: strin
 		btnRow.appendChild(ok);
 		box.appendChild(btnRow);
 		overlay.appendChild(box);
-		document.body.appendChild(overlay);
 		inputs[0].focus();
 	} catch (e) { console.error('showInputDialog failed', e); }
 }

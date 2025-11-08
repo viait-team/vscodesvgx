@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
+// extension.ts
 import * as vscode from "vscode";
 import { VisualXmlSerializerNode } from "./serializer/VisualXmlSerializerNode";
 import { processWebviewMessage } from "./webviewMessageAdapter";
@@ -256,6 +256,20 @@ class VisualEditorProvider
 								// Send the original XML text for initialization to avoid DOMParser producing
 								// an HTML <parsererror> document when given altered/re-serialized input.
 								try { webviewPanel.webview.postMessage({ type: "init", content: xml, theme: isDark ? "dark" : "light", experimentalTwoPanel: twoPanel }); output.appendLine('visual-xml-editor: init posted (experimentalTwoPanel=' + String(twoPanel) + ')'); } catch (err) { /* ignore */ }
+
+								// =================================================================================
+								// SMARTSENSE MODIFICATION: Load the JSON store and send it to the webview.
+								// =================================================================================
+								try {
+									const intellisenseUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'attributeValues.json');
+									const intellisenseData = await vscode.workspace.fs.readFile(intellisenseUri);
+									const jsonData = JSON.parse(new TextDecoder().decode(intellisenseData));
+									webviewPanel.webview.postMessage({ type: "initIntellisense", data: jsonData });
+								} catch (err) {
+									console.error('Failed to load or send intellisense data:', err);
+									output.appendLine('Smartsense: Failed to initialize - ' + (err as Error).message);
+								}
+								// =================================================================================
 
 								// notify the webview if the theme changes while the panel is open
 								try {
