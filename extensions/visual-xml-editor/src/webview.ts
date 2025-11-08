@@ -4,8 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 // webview.ts
 
-// SMARTSENSE MODIFICATION: Add a global store for our local intellisense data.
+// SMARTSENSE MODIFICATION: Add global stores for all our local intellisense data.
 let attributeValueStore: Record<string, string[]> = {};
+let attributeNameStore: Record<string, string[]> = {};
+let elementNameStore: string[] = [];
 
 // VS Code webview API
 interface WebviewApi {
@@ -94,9 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('message', (event: MessageEvent) => {
 	const message = event.data;
 	switch (message.type) {
-		// SMARTSENSE MODIFICATION: Add a handler to receive the intellisense data from the extension.
+		// SMARTSENSE MODIFICATION: Add handlers to receive all intellisense data from the extension.
 		case 'initIntellisense':
 			attributeValueStore = message.data;
+			break;
+		case 'initAttributeNames':
+			attributeNameStore = message.data;
+			break;
+		case 'initElementNames':
+			elementNameStore = message.data;
 			break;
 		case 'init':
 			console.debug('vxe: init received. experimentalTwoPanel=', !!message.experimentalTwoPanel);
@@ -556,7 +564,7 @@ function getInputValue(element: HTMLElement): string {
 function createSmartValueInput(attributeName: string, currentValue: string, node: Element): HTMLElement {
 	const attrLower = attributeName.toLowerCase();
 
-	// SMARTSENSE MODIFICATION: Remove hard-coded object and use the new global store.
+	// SMARTSENSE MODIFICATION: Use the new global store instead of the hard-coded object.
 	const options = attributeValueStore[attrLower];
 
 	// Always create an input field (no more dropdowns!)
@@ -921,6 +929,13 @@ function renderAttributes(node: Element): void {
 	addRow.className = 'attr-add-row';
 	const addName = document.createElement('input');
 	addName.placeholder = 'name';
+	// SMARTSENSE MODIFICATION: Apply state-aware intellisense to the 'Add Attribute' input.
+	const tagName = node.nodeName.toLowerCase();
+	const existingAttributes = new Set(Array.from(node.attributes).map(attr => attr.name));
+	const allValidAttributes = attributeNameStore[tagName] || [];
+	const suggestionList = allValidAttributes.filter(attr => !existingAttributes.has(attr));
+	setupVSCodeStyleCompletion(addName, suggestionList);
+
 	let addVal = document.createElement('input') as HTMLElement;
 	if (addVal instanceof HTMLInputElement) {
 		addVal.placeholder = 'value';

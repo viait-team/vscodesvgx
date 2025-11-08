@@ -270,6 +270,24 @@ class VisualEditorProvider
 									output.appendLine('Smartsense: Failed to initialize - ' + (err as Error).message);
 								}
 								// =================================================================================
+								// SMARTSENSE MODIFICATION: Load the attribute and element name stores.
+								// =================================================================================
+								try {
+									const attributeNamesUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'attributeNames.json');
+									const attributeNamesData = await vscode.workspace.fs.readFile(attributeNamesUri);
+									const attributeNamesJson = JSON.parse(new TextDecoder().decode(attributeNamesData));
+									webviewPanel.webview.postMessage({ type: "initAttributeNames", data: attributeNamesJson });
+
+									const elementNamesUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'ElementNames.json');
+									const elementNamesData = await vscode.workspace.fs.readFile(elementNamesUri);
+									const elementNamesJson = JSON.parse(new TextDecoder().decode(elementNamesData));
+									webviewPanel.webview.postMessage({ type: "initElementNames", data: elementNamesJson });
+
+								} catch (err) {
+									console.error('Failed to load Smartsense name stores:', err);
+									output.appendLine('Smartsense: Failed to initialize name stores - ' + (err as Error).message);
+								}
+								// =================================================================================
 
 								// notify the webview if the theme changes while the panel is open
 								try {
