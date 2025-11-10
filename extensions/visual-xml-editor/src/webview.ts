@@ -1170,10 +1170,9 @@ function extractElementInfo(node: Element): { tagName: string; id?: string; clas
 			}
 			default: {
 				// For elements not specifically handled, use element index among same-tag siblings
-				if (node.parentNode) {
-					const siblings = Array.from(node.parentNode.children)
-						.filter(child => child.tagName.toLowerCase() === tagName.toLowerCase());
-					const index = siblings.indexOf(node);
+				if (node) {
+					const elements = document.querySelectorAll(tagName);
+					const index = Array.from(elements).indexOf(node);
 					if (index >= 0) {
 						keyAttributes['element-index'] = index.toString();
 					}
