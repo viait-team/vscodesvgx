@@ -2,32 +2,88 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+// svgxEditorProvider.ts
 
 import * as vscode from 'vscode';
 import { SvgxDocument } from './svgxDocument';
 import { DOMParser } from '@xmldom/xmldom';
-
+import { SvgxClipboardService } from './svgxClipboardService'; // --- SVGX: Import clipboard service
+import { SvgxClipboardData } from './types'; // --- SVGX: Import data types
 
 export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocument> {
 
-	public static register(context: vscode.ExtensionContext): vscode.Disposable {
+	public static register(context: vscode.ExtensionContext, clipboardService: SvgxClipboardService): vscode.Disposable {
 		console.log('SVGX Extension: Registering SvgxEditorProvider');
-		const provider = new SvgxEditorProvider(context);
-		const disposable = vscode.window.registerCustomEditorProvider(SvgxEditorProvider.viewType, provider, {
+
+		const copyCommand = vscode.commands.registerCommand('svgx.copyLogical', () => {
+			if (SvgxEditorProvider.activeEditorProvider) {
+				SvgxEditorProvider.activeEditorProvider._copyLogical();
+			}
+		});
+		context.subscriptions.push(copyCommand);
+
+		const pasteCommand = vscode.commands.registerCommand('svgx.pasteLogical', () => {
+			if (SvgxEditorProvider.activeEditorProvider) {
+				SvgxEditorProvider.activeEditorProvider._pasteLogical();
+			}
+		});
+		context.subscriptions.push(pasteCommand);
+
+		const provider = new SvgxEditorProvider(context, clipboardService);
+		const providerRegistration = vscode.window.registerCustomEditorProvider(SvgxEditorProvider.viewType, provider, {
 			webviewOptions: {
 				retainContextWhenHidden: true,
 			},
 			supportsMultipleEditorsPerDocument: false,
 		});
+
+		context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {
+			if (vscode.window.activeTextEditor?.document.uri.fsPath.endsWith('.svgx')) {
+				SvgxEditorProvider.activeEditorProvider = provider;
+			}
+		}));
+
 		console.log('SVGX Extension: SvgxEditorProvider registered successfully');
-		return disposable;
+		return vscode.Disposable.from(providerRegistration, copyCommand, pasteCommand);
 	}
 
 	private static readonly viewType = 'svgx.editor';
+	private static activeEditorProvider: SvgxEditorProvider | undefined;
+
+	private readonly _webviews = new Map<string, vscode.WebviewPanel>();
 
 	constructor(
-		private readonly context: vscode.ExtensionContext
+		private readonly context: vscode.ExtensionContext,
+		private readonly _clipboardService: SvgxClipboardService
 	) { }
+
+	private _copyLogical(): void {
+		const activeDocumentUri = vscode.window.activeTextEditor?.document.uri.toString();
+		if (!activeDocumentUri) { return; }
+
+		const webviewPanel = this._webviews.get(activeDocumentUri);
+		if (webviewPanel) {
+			console.log('SVGX: Sending getCopyDataRequest to webview...');
+			webviewPanel.webview.postMessage({ type: 'getCopyDataRequest' });
+		}
+	}
+
+	private _pasteLogical(): void {
+		const activeDocumentUri = vscode.window.activeTextEditor?.document.uri.toString();
+		if (!activeDocumentUri) { return; }
+
+		const webviewPanel = this._webviews.get(activeDocumentUri);
+		if (webviewPanel && this._clipboardService.hasData()) {
+			console.log('SVGX: Sending pasteDataRequest to webview...');
+			webviewPanel.webview.postMessage({
+				type: 'pasteDataRequest',
+				payload: this._clipboardService.getData()
+			});
+		} else {
+			console.warn('SVGX: Paste called but no logical data found in clipboard service.');
+		}
+	}
+
 
 	async openCustomDocument(
 		uri: vscode.Uri,
@@ -43,17 +99,18 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		webviewPanel: vscode.WebviewPanel,
 		_token: vscode.CancellationToken
 	): Promise<void> {
-		// Setup webview
+		this._webviews.set(document.uri.toString(), webviewPanel);
+		webviewPanel.onDidDispose(() => this._webviews.delete(document.uri.toString()));
+		SvgxEditorProvider.activeEditorProvider = this;
+
 		webviewPanel.webview.options = {
 			enableScripts: true,
 		};
 		webviewPanel.webview.html = await this.getHtmlForWebview(webviewPanel.webview);
 
-		// Handle messages from the webview
 		webviewPanel.webview.onDidReceiveMessage(e => {
 			switch (e.type) {
 				case 'ready': {
-					// Send initial content when webview is ready (like Visual XML Editor)
 					const xml = new TextDecoder().decode(document.documentData);
 					const isDark = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
 					webviewPanel.webview.postMessage({
@@ -66,8 +123,38 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 				case 'edit':
 					this._makeEdit(document, e.content);
 					return;
+
+				case 'copyDataResponse':
+					if (e.payload) {
+						this._clipboardService.setData(e.payload as SvgxClipboardData);
+						vscode.window.showInformationMessage('SVGX: Logical data copied.');
+					} else {
+						vscode.window.showWarningMessage('SVGX: Nothing selected to copy.');
+					}
+					return;
+
+				case 'documentUpdate':
+					if (e.payload) {
+						this._updateDocument(document, e.payload);
+					}
+					return;
 			}
 		});
+	}
+
+	// --- SVGX: Corrected to calculate lineCount ---
+	private _updateDocument(document: SvgxDocument, newSvgString: string) {
+		const edit = new vscode.WorkspaceEdit();
+		// Get the content from the document model to determine its line count.
+		const currentContent = new TextDecoder().decode(document.documentData);
+		const lineCount = currentContent.split('\n').length;
+
+		edit.replace(
+			document.uri,
+			new vscode.Range(0, 0, lineCount, 0), // Replace the entire document range
+			newSvgString
+		);
+		vscode.workspace.applyEdit(edit); // This is an undoable operation
 	}
 
 	private _makeEdit(document: SvgxDocument, newContent: string) {
@@ -86,6 +173,8 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 	}
 
 	private async getHtmlForWebview(webview: vscode.Webview): Promise<string> {
+		// --- SVGX: Nonce removed in the previewWebview.html for default CSP policy ---
+		// It is not used currently, but we kept here for future reference.
 		const nonce = getNonce();
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
 			this.context.extensionUri, 'media', 'svgxWebview.js'));
@@ -118,7 +207,16 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 	}
 
 	public async backupCustomDocument(document: SvgxDocument, context: vscode.CustomDocumentBackupContext, cancellation: vscode.CancellationToken): Promise<vscode.CustomDocumentBackup> {
-		await this.saveCustomDocumentAs(document, context.destination, cancellation);
+
+		const cancellationListener = cancellation.onCancellationRequested(() => { /* no-op */ });
+
+		try {
+			await this.saveCustomDocumentAs(document, context.destination, cancellation);
+		} finally {
+			// This is the critical step: we dispose of the listener we created.
+			cancellationListener.dispose();
+		}
+
 		return {
 			id: context.destination.toString(),
 			delete: async () => {

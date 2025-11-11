@@ -278,7 +278,7 @@ class VisualEditorProvider
 									const attributeNamesJson = JSON.parse(new TextDecoder().decode(attributeNamesData));
 									webviewPanel.webview.postMessage({ type: "initAttributeNames", data: attributeNamesJson });
 
-									const elementNamesUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'ElementNames.json');
+									const elementNamesUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'elementNames.json');
 									const elementNamesData = await vscode.workspace.fs.readFile(elementNamesUri);
 									const elementNamesJson = JSON.parse(new TextDecoder().decode(elementNamesData));
 									webviewPanel.webview.postMessage({ type: "initElementNames", data: elementNamesJson });

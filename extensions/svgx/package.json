@@ -36,7 +36,45 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "svgx.copyLogical",
+        "title": "Copy Logical",
+        "category": "SVGX"
+      },
+      {
+        "command": "svgx.pasteLogical",
+        "title": "Paste Logical",
+        "category": "SVGX"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.copyLogical",
+          "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.pasteLogical",
+          "group": "navigation"
+        }
+      ],
+      "webview/context": [
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.copyLogical",
+          "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.pasteLogical",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "npx gulp compile-extension:svgx && npm run compile:webview",
@@ -51,7 +89,11 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.57.0",
-    "@types/xmldom": "^0.1.34"
+    "@types/xmldom": "^0.1.34",
+    "@types/d3": "^7.4.3",
+    "d3": "^7.9.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.2"
   },
   "repository": {
     "type": "git",
