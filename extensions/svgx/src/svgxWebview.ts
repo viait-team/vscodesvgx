@@ -2,11 +2,11 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-//svgxwebview.ts
-
-console.log('SVGX: webview script loading...');
+// svgxwebview.ts
 
 declare const d3: any;
+
+console.log('SVGX: webview script loading...');
 
 // VS Code webview API
 interface WebviewApi {
@@ -15,6 +15,11 @@ interface WebviewApi {
 	setState(state: any): void;
 }
 
+const typedWindow = window as Window & {
+	svgxLogicalOps?: SvgxLogicalOperations;
+	d3?: any;
+};
+
 declare const acquireVsCodeApi: () => WebviewApi;
 const svgxVscode = acquireVsCodeApi();
 
@@ -22,7 +27,7 @@ function svgxSafePostMessage(msg: any): void {
 	svgxVscode.postMessage(msg);
 }
 
-// SVGX visual editor (following previewWebview.ts pattern)
+// SVGX visual editor
 window.addEventListener('message', (event: MessageEvent) => {
 	console.log('SVGX: Message event listener initialized and received message:', event.data?.type);
 	const message = event.data;
@@ -52,27 +57,21 @@ window.addEventListener('message', (event: MessageEvent) => {
 		case 'flashElement':
 			svgxFlashElement(message.elementId || message.selector);
 			break;
-		// --- SVGX Logical Copy/Paste: START ---
-		// Handle messages from the extension host to trigger logical operations
+		// --- SVGX Logical Copy/Paste ---
 		case 'getCopyDataRequest':
-			if (window.svgxLogicalOps) {
-				const copyData = window.svgxLogicalOps.getLogicalCopyData();
+			if (typedWindow.svgxLogicalOps) {
+				const copyData = typedWindow.svgxLogicalOps.getLogicalCopyData();
 				svgxSafePostMessage({ type: 'copyDataResponse', payload: copyData });
 			}
 			break;
 		case 'pasteDataRequest':
-			if (window.svgxLogicalOps && message.payload) {
-				const newSvgString = window.svgxLogicalOps.pasteLogicalData(message.payload);
-				// This response will be handled by the extension host to persist the change
+			if (typedWindow.svgxLogicalOps && message.payload) {
+				const newSvgString = typedWindow.svgxLogicalOps.pasteLogicalData(message.payload);
 				svgxSafePostMessage({ type: 'documentUpdate', payload: newSvgString });
 			}
 			break;
-		// --- SVGX Logical Copy/Paste: END ---
 	}
 });
-
-let svgxCurrentDoc: Document | null = null;
-const svgxSelectedNode: Element | null = null;
 
 function svgxShowStatus(msg: string, timeout: number = 2500): void {
 	try {
@@ -99,166 +98,103 @@ function svgxShowStatus(msg: string, timeout: number = 2500): void {
 
 function svgxRenderRoot(xmlText: string, _visualEditor: boolean): void {
 	console.log('SVGX: svgxRenderRoot function called');
-	const parser = new DOMParser();
-	const doc = parser.parseFromString(xmlText, 'application/xml');
-	svgxCurrentDoc = doc;
 	const root = document.getElementById('root');
 	if (!root) { console.warn('svgx: missing root element'); return; }
-	root.innerHTML = xmlText;
-	console.log('svg doc is loaded');
 
-	// Initialize D3.js for visual enhancements
+	// FIX: Create a container for the SVG to enable zoom/pan on the parent.
+	root.innerHTML = '';
+	const container = document.createElement('div');
+	container.id = 'svgx-svg-container';
+	const displayContent = xmlText.trim().replace(/^\s*<\?xml[^?]*\?>/, '');
+	container.innerHTML = displayContent;
+	root.appendChild(container);
+	console.log('svg doc is loaded into container');
+
+	// FIX: Initialize D3.js with dynamic loading.
 	svgxInitializeD3Enhancement();
 
-	// Setup click handlers for editor sync
-	svgxSetupClickHandlers(null);
-
-	// --- SVGX Logical Copy/Paste: START ---
-	// Instantiate the logical operations engine for this document
-	if (root.querySelector('svg')) {
-		window.svgxLogicalOps = new SvgxLogicalOperations(root.querySelector('svg')!);
+	const svgElement = root.querySelector('svg');
+	if (svgElement) {
+		typedWindow.svgxLogicalOps = new SvgxLogicalOperations(svgElement);
 	}
-	// --- SVGX Logical Copy/Paste: END ---
 }
 
-// D3.js Enhancement Functions for SVGX
+// FIX: New function to dynamically load D3.js, based on the previewWebview.ts pattern.
 function svgxInitializeD3Enhancement(): void {
-	console.log('SVGX: svgxInitializeD3Enhancement function called');
 	console.log('SVGX D3.js initialization starting...');
-	// Dynamically load d3.js if not already loaded
-	if (typeof (window as any).d3 === 'undefined') {
+	if (typeof typedWindow.d3 === 'undefined') {
 		console.log('SVGX D3.js not found, attempting to load from CDN...');
 		const script = document.createElement('script');
 		script.src = 'https://d3js.org/d3.v7.min.js';
 		script.onload = () => {
-			console.log('SVGX D3.js loaded dynamically, version:', (window as any).d3.version);
+			console.log('SVGX D3.js loaded dynamically, version:', typedWindow.d3.version);
 			svgxSetupD3Functionality();
 		};
 		script.onerror = (error) => {
 			console.error('SVGX failed to load D3.js from CDN:', error);
-			console.warn('SVGX failed to load D3.js from CDN, visual features disabled');
+			svgxShowStatus('Error: Failed to load D3.js library.');
 		};
 		document.head.appendChild(script);
-		console.log('SVGX D3.js script element added to head');
 	} else {
-		console.log('SVGX D3.js already available, version:', (window as any).d3.version);
+		console.log('SVGX D3.js already available, version:', typedWindow.d3.version);
 		svgxSetupD3Functionality();
 	}
 }
 
+// FIX: Rewritten to apply zoom/pan to the correct containers, based on previewWebview.ts.
 function svgxSetupD3Functionality(): void {
 	console.log('SVGX: svgxSetupD3Functionality function called');
-	const rootContainer = d3.select('#root');
-	const svg = rootContainer.select('svg');
 
-	if (svg.empty()) {
-		console.warn('SVGX SVG element not found for D3 zoom/pan');
+	const rootContainer = d3.select('#root');
+	const svgContainer = rootContainer.select('#svgx-svg-container');
+
+	if (svgContainer.empty()) {
+		console.warn('SVGX: SVG container not found for D3 zoom/pan');
 		return;
 	}
 
-	// Apply zoom/pan to the root div container, not the SVG itself
 	const zoom = d3.zoom()
 		.on('zoom', (event: any) => {
-			// Apply transform to the SVG element via CSS transform
-			svg.style('transform',
+			svgContainer.style('transform',
 				`translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`);
 		});
 
-	// Attach zoom behavior to the root container
 	rootContainer.call(zoom);
 
 	console.log('SVGX D3.js zoom and pan enabled on container div');
 	svgxShowStatus('SVGX Editor initialized with D3.js v' + d3.version);
 
-	// Setup click handlers on the original SVG (no wrapping needed)
-	svgxSetupClickHandlers(svg);
+	// svgxSetupClickHandlers();
 }
 
-function svgxSetupClickHandlers(selection: any): void {
-	if (!selection || selection.empty()) {
-		console.warn('SVGX: Invalid selection for click handlers');
+// --- BUG FIX: The entire block below was the source of the conflict and has been removed to restore correct functionality. ---
+/*
+// FIX: Updated to use the new container and a single event listener.
+function svgxSetupClickHandlers(): void {
+	const container = document.getElementById('svgx-svg-container');
+	if (!container) {
+		console.warn('SVGX: SVG container not found for click handlers');
 		return;
 	}
 
-	selection.selectAll('*').on('click', (event: MouseEvent) => {
-		event.stopPropagation(); // Prevent zoom from interfering with clicks
+	container.addEventListener('click', (event) => {
+		event.stopPropagation();
 		const target = event.target as Element;
-		console.log('SVGX: Element clicked for selection hint:', target.tagName);
+		console.log('SVGX: Element clicked:', target.tagName);
 
-		// Instead of sending a message, we now provide a direct visual hint by flashing the element.
-		// This avoids triggering the 'dirty' state and the disposable leak.
-		if (target) {
-			svgxFlashElement(target);
+		const svgElement = container.querySelector('svg');
+
+		if (target && svgElement) {
+			const elementInfo = svgxExtractElementInfo(target);
+			if (elementInfo) {
+				svgxSafePostMessage({
+					type: 'edit',
+					content: svgElement.outerHTML
+				});
+			}
 		}
 	});
 }
-
-
-// --- FIX: Refactor this function to accept either a selector string OR a direct element reference.
-function svgxFlashElement(elementOrSelector: string | Element): void {
-	const d3 = (window as any).d3;
-	if (typeof d3 === 'undefined') {
-		console.log('SVGX: D3.js not available, cannot flash element');
-		svgxShowStatus('D3.js flashing not available');
-		return;
-	}
-
-	console.log('SVGX: Executing flash animation');
-
-	let element: any; // This will hold the d3 selection
-
-	// Check if we were given a string (selector) or an object (element)
-	if (typeof elementOrSelector === 'string') {
-		// Try to find element by various selectors
-		element = d3.select(elementOrSelector);
-		// If not found by selector, try as ID
-		if (element.empty() && !elementOrSelector.startsWith('#')) {
-			element = d3.select('#' + elementOrSelector);
-		}
-	} else {
-		// We were given a direct element reference
-		element = d3.select(elementOrSelector);
-	}
-
-
-	if (element.empty()) {
-		console.warn('SVGX element not found for flashing:', elementOrSelector);
-		svgxShowStatus('Element not found for flashing');
-		return;
-	}
-
-	console.log('SVGX flashing element:', element.node());
-	svgxShowStatus('Flashing element...');
-
-	// Save original styles
-	const originalStroke = element.style('stroke');
-	const originalStrokeWidth = element.style('stroke-width');
-	const originalFillOpacity = element.style('fill-opacity');
-
-	// Create D3.js flashing animation
-	element.transition()
-		.duration(300)
-		.style('stroke', '#ff4757')
-		.style('stroke-width', '4px')
-		.style('fill-opacity', '0.7')
-		.transition()
-		.duration(300)
-		.style('stroke', '#ffa502')
-		.style('stroke-width', '6px')
-		.style('fill-opacity', '1.0')
-		.transition()
-		.duration(300)
-		.style('stroke', '#ff4757')
-		.style('stroke-width', '4px')
-		.style('fill-opacity', '0.7')
-		.transition()
-		.duration(300)
-		.style('stroke', originalStroke)
-		.style('stroke-width', originalStrokeWidth)
-		.style('fill-opacity', originalFillOpacity);
-}
-
-
 
 function svgxExtractElementInfo(node: Element): { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> } | null {
 	if (!node) { return null; }
@@ -266,11 +202,8 @@ function svgxExtractElementInfo(node: Element): { tagName: string; id?: string; 
 	const tagName = node.nodeName;
 	const id = node.getAttribute('id') || undefined;
 	const className = node.getAttribute('class') || undefined;
-
-	// Extract key attributes for matching when no ID
 	const keyAttributes: Record<string, string> = {};
 	if (!id && node.attributes) {
-		// For common SVG elements, extract identifying attributes
 		switch (tagName.toLowerCase()) {
 			case 'circle':
 				svgxAddAttribute(node, 'cx', keyAttributes);
@@ -301,41 +234,148 @@ function svgxAddAttribute(node: Element, attrName: string, keyAttributes: Record
 		keyAttributes[attrName] = value;
 	}
 }
+*/
 
-// --- SVGX Logical Copy/Paste: START ---
+function svgxFlashElement(elementSelector: string): void {
+	if (typeof d3 === 'undefined') {
+		console.log('SVGX: D3.js not available, cannot flash element');
+		svgxShowStatus('D3.js flashing not available');
+		return;
+	}
 
-/**
- * Main class for handling all SVG logical operations within the webview.
- */
+	console.log('SVGX: Executing flash animation');
+	let element = d3.select(elementSelector);
+	if (element.empty() && elementSelector && !elementSelector.startsWith('#')) {
+		element = d3.select('#' + elementSelector);
+	}
+	if (element.empty()) {
+		const domElement = document.querySelector(elementSelector) ||
+			document.getElementById(elementSelector) ||
+			document.querySelector(`[id="${elementSelector}"]`);
+		if (domElement) {
+			element = d3.select(domElement);
+		}
+	}
+	if (element.empty()) {
+		console.warn('SVGX element not found for flashing:', elementSelector);
+		svgxShowStatus('Element not found: ' + elementSelector);
+		return;
+	}
+
+	console.log('SVGX flashing element:', elementSelector);
+	svgxShowStatus('Flashing element with D3.js: ' + elementSelector);
+
+	const originalStroke = element.style('stroke');
+	const originalStrokeWidth = element.style('stroke-width');
+	const originalFillOpacity = element.style('fill-opacity');
+
+	element.transition()
+		.duration(300)
+		.style('stroke', '#ff4757')
+		.style('stroke-width', '4px')
+		.style('fill-opacity', '0.7')
+		.transition()
+		.duration(300)
+		.style('stroke', '#ffa502')
+		.style('stroke-width', '6px')
+		.style('fill-opacity', '1.0')
+		.transition()
+		.duration(300)
+		.style('stroke', '#ff4757')
+		.style('stroke-width', '4px')
+		.style('fill-opacity', '0.7')
+		.transition()
+		.duration(300)
+		.style('stroke', originalStroke)
+		.style('stroke-width', originalStrokeWidth)
+		.style('fill-opacity', originalFillOpacity);
+}
+
+// --- SVGX Logical Copy/Paste ---
+
+
+class SvgxLogicalMapping {
+
+	public has_x_startDate: boolean = true;
+	public x_startDate: Date = new Date('9/12/2025');
+	public x_scale_days: number = 365;
+
+	constructor() { }
+
+	//#region Logical Mapping Methods
+
+	public toLogicalX(vx: number, dx_min: number, dx_max: number, vx_min: number, vx_max: number): number {
+		if (vx_max === vx_min) {
+			return dx_min;
+		}
+		return dx_min + (vx - vx_min) * (dx_max - dx_min) / (vx_max - vx_min);
+	}
+
+	public toLogicalY(vy: number, dy_min: number, dy_max: number, vy_min: number, vy_max: number): number {
+		if (vy_min === vy_max) {
+			return dy_min;
+		}
+		return dy_min + (vy - vy_max) * (dy_max - dy_min) / (vy_min - vy_max);
+	}
+
+	public fromLogicalX(dx: number, dx_min: number, dx_max: number, vx_min: number, vx_max: number): number {
+		if (dx_max === dx_min) {
+			return vx_min;
+		}
+		return vx_min + (dx - dx_min) * (vx_max - vx_min) / (dx_max - dx_min);
+	}
+
+	public fromLogicalY(dy: number, dy_min: number, dy_max: number, vy_min: number, vy_max: number): number {
+		if (dy_max === dy_min) {
+			return vy_max;
+		}
+		return vy_max + (dy - dy_min) * (vy_min - vy_max) / (dy_max - dy_min);
+	}
+
+	//#endregion
+
+	//#region X Axis Date to Ticks Conversion
+
+	private _convert_date_to_ticks(r_posixct_date: Date): number {
+		const EPOCH_DIFF_DAYS = 719163;
+		const EPOCH_DIFF_SECONDS = EPOCH_DIFF_DAYS * 86400;
+		const TICKS_PER_SECOND = 10000000;
+		const seconds_from_unix_epoch = Math.round(r_posixct_date.getTime() / 1000);
+		const total_seconds = seconds_from_unix_epoch + EPOCH_DIFF_SECONDS;
+		return total_seconds * TICKS_PER_SECOND;
+	}
+
+	public toLogicalTickX(dx: number): number {
+		const dayOffset = dx * this.x_scale_days;
+		const milliseconds_offset = dayOffset * 24 * 60 * 60 * 1000;
+		const targetDate = new Date(this.x_startDate.getTime() + milliseconds_offset);
+		return this._convert_date_to_ticks(targetDate);
+	}
+
+	//#endregion
+}
+
 class SvgxLogicalOperations {
 	private svgRoot: SVGSVGElement;
+	private svgxLogicalMapping: SvgxLogicalMapping;
 	private currentlySelectedElement: SVGPathElement | null = null;
 
 	constructor(svgElement: SVGSVGElement) {
 		this.svgRoot = svgElement;
+		this.svgxLogicalMapping = new SvgxLogicalMapping();
 		this.initializeSelectionHandling();
 	}
 
-	/**
-	 * Task 1: Implements Path Selection Logic.
-	 * Adds click listeners to all path elements for selection.
-	 */
 	public initializeSelectionHandling(): void {
 		const paths = this.svgRoot.querySelectorAll('path');
 		paths.forEach(path => {
 			path.addEventListener('click', (event) => {
 				event.stopPropagation();
-
-				// Deselect previous element
 				if (this.currentlySelectedElement) {
 					this.currentlySelectedElement.classList.remove('selected');
 				}
-
-				// Select new element
 				this.currentlySelectedElement = path;
 				this.currentlySelectedElement.classList.add('selected');
-
-				// Add a simple visual style for selection
 				const styleId = 'svgx-selection-style';
 				if (!document.getElementById(styleId)) {
 					const style = document.createElement('style');
@@ -349,16 +389,11 @@ class SvgxLogicalOperations {
 					`;
 					document.head.appendChild(style);
 				}
-
 				svgxShowStatus('Path selected for logical copy.', 1500);
 			});
 		});
 	}
 
-	/**
-	 * Task 2: Implements the getLogicalCopyData() Method.
-	 * This is the core of the "Copy" operation, executed entirely in the webview.
-	 */
 	public getLogicalCopyData(): object | null {
 		if (!this.currentlySelectedElement) {
 			svgxShowStatus('No path selected to copy.', 2000);
@@ -367,30 +402,25 @@ class SvgxLogicalOperations {
 
 		const element = this.currentlySelectedElement;
 
-		// 1. Get CTM
 		const ctm = (element as SVGGraphicsElement).getCTM();
 		if (!ctm) {
 			console.error('SVGX Error: Could not get CTM for selected element.');
 			return null;
 		}
 
-		// 2. Find closest logical mapping definition
-		const mappingElement = element.closest('[svgx\\:xlm][svgx\\:ylm]') || this.svgRoot;
-		const xlmAttr = mappingElement.getAttribute('svgx:xlm');
-		const ylmAttr = mappingElement.getAttribute('svgx:ylm');
+		const mappingElement = element.closest('[xlm][ylm]') || this.svgRoot;
+		const xlmAttr = mappingElement.getAttribute('xlm');
+		const ylmAttr = mappingElement.getAttribute('ylm');
 		if (!xlmAttr || !ylmAttr) {
-			console.error('SVGX Error: No svgx:xlm/ylm mapping found on element or ancestors.');
+			console.error('SVGX Error: No xlm/ylm mapping found on element or ancestors.');
 			return null;
 		}
 
 		const xlm = JSON.parse(xlmAttr);
 		const ylm = JSON.parse(ylmAttr);
 
-		// 3. Convert path points to logical coordinates
-		// (This is a simplified example for M and L commands; a full implementation needs a proper path parser)
 		const d = element.getAttribute('d') || '';
 		const logicalPoints: { x: number, y: number }[] = [];
-		// NOTE: A robust implementation requires a full path data parser. This is a placeholder.
 		const commands = d.match(/[a-zA-Z][^a-zA-Z]*/g) || [];
 		commands.forEach(cmdStr => {
 			const command = cmdStr[0];
@@ -402,13 +432,12 @@ class SvgxLogicalOperations {
 
 				const transformedPt = pt.matrixTransform(ctm);
 
-				const logicalX = this._toLogical(transformedPt.x, xlm[0], xlm[1], xlm[2], xlm[3]);
-				const logicalY = this._toLogical(transformedPt.y, ylm[0], ylm[1], ylm[2], ylm[3]);
+				const logicalX = this._toLogicalX(transformedPt.x, xlm[0], xlm[1], xlm[2], xlm[3]);
+				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm[2], ylm[3]);
 				logicalPoints.push({ x: logicalX, y: logicalY });
 			}
 		});
 
-		// 4. Get legend data
 		const legendRefAttr = element.getAttribute('lc_legend_ref');
 		const legendData: any[] = [];
 		if (legendRefAttr) {
@@ -431,11 +460,10 @@ class SvgxLogicalOperations {
 			}
 		}
 
-		// 5. Package data
 		const attributes: { [key: string]: string } = {};
 		for (let i = 0; i < element.attributes.length; i++) {
 			const attr = element.attributes[i];
-			if (attr.name !== 'd' && attr.name !== 'class') { // Exclude 'd' and selection class
+			if (attr.name !== 'd' && attr.name !== 'class') {
 				attributes[attr.name] = attr.value;
 			}
 		}
@@ -454,33 +482,25 @@ class SvgxLogicalOperations {
 		return clipboardData;
 	}
 
-	/**
-	 * Task 3: Implements the pasteLogicalData() Method.
-	 * This is the core of the "Paste" operation, executed entirely in the webview.
-	 */
 	public pasteLogicalData(clipboardData: any): string | null {
-		// 1. Get target mapping
-		const mappingElement = this.svgRoot; // Pasting is global for now
-		const xlmAttr = mappingElement.getAttribute('svgx:xlm');
-		const ylmAttr = mappingElement.getAttribute('svgx:ylm');
+		const mappingElement = this.svgRoot;
+		const xlmAttr = mappingElement.getAttribute('xlm');
+		const ylmAttr = mappingElement.getAttribute('ylm');
 		if (!xlmAttr || !ylmAttr) {
-			console.error('SVGX Error: No svgx:xlm/ylm mapping found on target SVG.');
+			console.error('SVGX Error: No xlm/ylm mapping found on target SVG.');
 			return null;
 		}
 
 		const targetXlm = JSON.parse(xlmAttr);
 		const targetYlm = JSON.parse(ylmAttr);
 
-		// 2. Convert logical points to target user coordinates
 		const logicalPoints = clipboardData.element.logicalPoints;
-		// NOTE: Simplified path string construction, assumes only M and L commands
 		const d = logicalPoints.map((pt: any, i: number) => {
-			const userX = this._fromLogical(pt.x, targetXlm[0], targetXlm[1], targetXlm[2], targetXlm[3]);
-			const userY = this._fromLogical(pt.y, targetYlm[0], targetYlm[1], targetYlm[2], targetYlm[3]);
+			const userX = this._fromLogicalX(pt.x, targetXlm[0], targetXlm[1], targetXlm[2], targetXlm[3]);
+			const userY = this._fromLogicalY(pt.y, targetYlm[0], targetYlm[1], targetYlm[2], targetYlm[3]);
 			return (i === 0 ? 'M' : 'L') + `${userX} ${userY}`;
 		}).join(' ');
 
-		// 3. Create new elements
 		const pasteContainer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 		pasteContainer.setAttribute('class', 'pasted-element');
 
@@ -492,22 +512,19 @@ class SvgxLogicalOperations {
 
 		pasteContainer.appendChild(newPath);
 
-		// 4. Handle Legend Pasting
 		const legendContainer = this.svgRoot.querySelector('g[id*="legend"]');
-		if (legendContainer) { // Case 1: Existing Legend Box
+		if (legendContainer) {
 			clipboardData.legendData.forEach((legend: any) => {
 				const alreadyExists = legendContainer.querySelector(`text[lc_legend_id="${legend.id}"]`);
 				if (!alreadyExists) {
-					// Append new legend elements, simple append for now.
 					legendContainer.insertAdjacentHTML('beforeend', legend.definitionElement);
 					legend.instanceElements.forEach((inst: string) => {
 						legendContainer.insertAdjacentHTML('beforeend', inst);
 					});
 				}
 			});
-		} else { // Case 2: No Legend Box
+		} else {
 			clipboardData.legendData.forEach((legend: any) => {
-				// Annotate near path
 				pasteContainer.insertAdjacentHTML('beforeend', legend.definitionElement);
 				legend.instanceElements.forEach((inst: string) => {
 					pasteContainer.insertAdjacentHTML('beforeend', inst);
@@ -515,25 +532,35 @@ class SvgxLogicalOperations {
 			});
 		}
 
-		// 5. Append to SVG and return full content
 		this.svgRoot.appendChild(pasteContainer);
 		svgxShowStatus('Logical data pasted!', 2000);
 		return this.svgRoot.outerHTML;
 	}
 
-	// Helper: User to Logical conversion
-	private _toLogical(v: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
-		return d_min + (v - v_max) * (d_max - d_min) / (v_min - v_max);
+	private _toLogicalX(v: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
+		let dx = this.svgxLogicalMapping.toLogicalX(v, d_min, d_max, v_min, v_max);
+		if (this.svgxLogicalMapping.has_x_startDate) {
+			dx = this.svgxLogicalMapping.toLogicalTickX(dx);
+		}
+		return dx;
 	}
 
-	// Helper: Logical to User conversion
-	private _fromLogical(d: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
-		return v_max + (d - d_min) * (v_min - v_max) / (d_max - d_min);
+	private _toLogicalY(v: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
+		return this.svgxLogicalMapping.toLogicalY(v, d_min, d_max, v_min, v_max);
 	}
+
+	private _fromLogicalX(d: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
+		return this.svgxLogicalMapping.fromLogicalX(d, d_min, d_max, v_min, v_max);
+	}
+
+	private _fromLogicalY(d: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
+		return this.svgxLogicalMapping.fromLogicalY(d, d_min, d_max, v_min, v_max);
+	}
+
 }
-
-// --- SVGX Logical Copy/Paste: END ---
 
 // initial ready notification
 console.log('SVGX: All functions initialized, sending ready message');
 svgxSafePostMessage({ type: 'ready' });
+
+export { };

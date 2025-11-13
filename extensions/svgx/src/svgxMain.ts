@@ -6,18 +6,19 @@
 
 import * as vscode from 'vscode';
 import { SvgxEditorProvider } from './svgxEditorProvider';
-import { SvgxClipboardService } from './svgxClipboardService'; // Import the new service
+// import { SvgxClipboardService } from './svgxClipboardService'; // Import the new service
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('SVGX Extension: activate() called');
 
 	// --- SVGX Logical Copy/Paste: START ---
 	// Instantiate the clipboard service as a singleton for the entire extension.
-	const clipboardService = new SvgxClipboardService();
+	// const clipboardService = new SvgxClipboardService();
 	// --- SVGX Logical Copy/Paste: END ---
 
 	// Register the custom editor provider, passing the singleton clipboard service instance.
-	context.subscriptions.push(SvgxEditorProvider.register(context, clipboardService));
+	// context.subscriptions.push(SvgxEditorProvider.register(context, clipboardService));
+	context.subscriptions.push(SvgxEditorProvider.register(context));
 
 	console.log('SVGX Extension: SvgxEditorProvider registered');
 }
