@@ -263,7 +263,7 @@ class SvgxLogicalMapping {
 		if (dy_max === dy_min) {
 			return vy_max;
 		}
-		return vy_max + (dy - dy_min) * (vy_min - vy_max) / (dy_max - dy_min);
+		return vy_min + (dy - dy_min) * (vy_max - vy_min) / (dy_max - dy_min);
 		// return vy_max + (dy - dy_min) * (vy_max - vy_min) / (dy_max - dy_min);
 	}
 
