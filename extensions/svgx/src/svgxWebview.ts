@@ -66,6 +66,8 @@ window.addEventListener('message', (event: MessageEvent) => {
 			break;
 		case 'pasteDataRequest':
 			if (typedWindow.svgxLogicalOps && message.payload) {
+
+				//// typedWindow.svgxLogicalOps.pasteLogicalData(message.payload);
 				const newSvgString = typedWindow.svgxLogicalOps.pasteLogicalData(message.payload);
 				svgxSafePostMessage({ type: 'documentUpdate', payload: newSvgString });
 			}
@@ -163,78 +165,7 @@ function svgxSetupD3Functionality(): void {
 
 	console.log('SVGX D3.js zoom and pan enabled on container div');
 	svgxShowStatus('SVGX Editor initialized with D3.js v' + d3.version);
-
-	// svgxSetupClickHandlers();
 }
-
-// --- BUG FIX: The entire block below was the source of the conflict and has been removed to restore correct functionality. ---
-/*
-// FIX: Updated to use the new container and a single event listener.
-function svgxSetupClickHandlers(): void {
-	const container = document.getElementById('svgx-svg-container');
-	if (!container) {
-		console.warn('SVGX: SVG container not found for click handlers');
-		return;
-	}
-
-	container.addEventListener('click', (event) => {
-		event.stopPropagation();
-		const target = event.target as Element;
-		console.log('SVGX: Element clicked:', target.tagName);
-
-		const svgElement = container.querySelector('svg');
-
-		if (target && svgElement) {
-			const elementInfo = svgxExtractElementInfo(target);
-			if (elementInfo) {
-				svgxSafePostMessage({
-					type: 'edit',
-					content: svgElement.outerHTML
-				});
-			}
-		}
-	});
-}
-
-function svgxExtractElementInfo(node: Element): { tagName: string; id?: string; className?: string; keyAttributes?: Record<string, string> } | null {
-	if (!node) { return null; }
-
-	const tagName = node.nodeName;
-	const id = node.getAttribute('id') || undefined;
-	const className = node.getAttribute('class') || undefined;
-	const keyAttributes: Record<string, string> = {};
-	if (!id && node.attributes) {
-		switch (tagName.toLowerCase()) {
-			case 'circle':
-				svgxAddAttribute(node, 'cx', keyAttributes);
-				svgxAddAttribute(node, 'cy', keyAttributes);
-				svgxAddAttribute(node, 'r', keyAttributes);
-				break;
-			case 'rect':
-				svgxAddAttribute(node, 'x', keyAttributes);
-				svgxAddAttribute(node, 'y', keyAttributes);
-				svgxAddAttribute(node, 'width', keyAttributes);
-				svgxAddAttribute(node, 'height', keyAttributes);
-				break;
-			case 'path':
-				svgxAddAttribute(node, 'd', keyAttributes);
-				break;
-			case 'polygon':
-				svgxAddAttribute(node, 'points', keyAttributes);
-				break;
-		}
-	}
-
-	return { tagName, id, className, keyAttributes };
-}
-
-function svgxAddAttribute(node: Element, attrName: string, keyAttributes: Record<string, string>): void {
-	const value = node.getAttribute(attrName);
-	if (value) {
-		keyAttributes[attrName] = value;
-	}
-}
-*/
 
 function svgxFlashElement(elementSelector: string): void {
 	if (typeof d3 === 'undefined') {
@@ -291,8 +222,10 @@ function svgxFlashElement(elementSelector: string): void {
 		.style('fill-opacity', originalFillOpacity);
 }
 
-// --- SVGX Logical Copy/Paste ---
 
+//
+// --- SVGX Logical Copy/Paste ---
+//
 
 class SvgxLogicalMapping {
 
@@ -315,7 +248,8 @@ class SvgxLogicalMapping {
 		if (vy_min === vy_max) {
 			return dy_min;
 		}
-		return dy_min + (vy - vy_max) * (dy_max - dy_min) / (vy_min - vy_max);
+		return dy_min + (vy - vy_min) * (dy_max - dy_min) / (vy_max - vy_min);
+		// return dy_min + (vy - vy_min) * (dy_max - dy_min) / (vy_max - vy_min);
 	}
 
 	public fromLogicalX(dx: number, dx_min: number, dx_max: number, vx_min: number, vx_max: number): number {
@@ -330,6 +264,7 @@ class SvgxLogicalMapping {
 			return vy_max;
 		}
 		return vy_max + (dy - dy_min) * (vy_min - vy_max) / (dy_max - dy_min);
+		// return vy_max + (dy - dy_min) * (vy_max - vy_min) / (dy_max - dy_min);
 	}
 
 	//#endregion
@@ -407,6 +342,7 @@ class SvgxLogicalOperations {
 			console.error('SVGX Error: Could not get CTM for selected element.');
 			return null;
 		}
+		console.log('SVGX CopyLogical: CTM:', ctm);
 
 		const mappingElement = element.closest('[xlm][ylm]') || this.svgRoot;
 		const xlmAttr = mappingElement.getAttribute('xlm');
@@ -415,9 +351,12 @@ class SvgxLogicalOperations {
 			console.error('SVGX Error: No xlm/ylm mapping found on element or ancestors.');
 			return null;
 		}
+		console.log('SVGX CopyLogical: xlmAttr:', xlmAttr);
+		console.log('SVGX CopyLogical: ylmAttr:', ylmAttr);
 
 		const xlm = JSON.parse(xlmAttr);
 		const ylm = JSON.parse(ylmAttr);
+		// console.log('SVGX CopyLogical: ylm[3]:', ylm[3], 'ylm[2]:', ylm[2]);
 
 		const d = element.getAttribute('d') || '';
 		const logicalPoints: { x: number, y: number }[] = [];
@@ -430,13 +369,15 @@ class SvgxLogicalOperations {
 				pt.x = points[0];
 				pt.y = points[1];
 
-				const transformedPt = pt.matrixTransform(ctm);
-
+				// const transformedPt = pt.matrixTransform(ctm);
+				const transformedPt = pt;
 				const logicalX = this._toLogicalX(transformedPt.x, xlm[0], xlm[1], xlm[2], xlm[3]);
-				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm[2], ylm[3]);
+				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm[3], ylm[2]);
 				logicalPoints.push({ x: logicalX, y: logicalY });
 			}
 		});
+		console.log('SVGX CopyLogical: path data d:', d);
+		console.log('SVGX CopyLogical: logicalPoints:', logicalPoints);
 
 		const legendRefAttr = element.getAttribute('lc_legend_ref');
 		const legendData: any[] = [];
@@ -451,6 +392,7 @@ class SvgxLogicalOperations {
 						legendData.push({
 							id: id,
 							definitionElement: defElement.outerHTML,
+							definitionText: defElement.textContent || '',
 							instanceElements: Array.from(instElements).map(el => el.outerHTML)
 						});
 					}
@@ -483,56 +425,87 @@ class SvgxLogicalOperations {
 	}
 
 	public pasteLogicalData(clipboardData: any): string | null {
-		const mappingElement = this.svgRoot;
-		const xlmAttr = mappingElement.getAttribute('xlm');
-		const ylmAttr = mappingElement.getAttribute('ylm');
-		if (!xlmAttr || !ylmAttr) {
-			console.error('SVGX Error: No xlm/ylm mapping found on target SVG.');
+		console.log('SVGX: pastLogicalData is called with data');
+		if (typeof d3 === 'undefined' || !d3.select) {
+			console.error('SVGX Error: D3.js is not available for pasting.');
+			svgxShowStatus('Error: D3.js not loaded. Cannot paste.');
 			return null;
 		}
 
+		const targetSvg = d3.select(this.svgRoot);
+
+		const xlmAttr = this.svgRoot.getAttribute('xlm');
+		const ylmAttr = this.svgRoot.getAttribute('ylm');
+		if (!xlmAttr || !ylmAttr) {
+			console.error('SVGX Error: No xlm/ylm mapping found on the target SVG.');
+			return null;
+		}
+		console.log('SVGX PasteLogical: xlmAttr:', xlmAttr);
+		console.log('SVGX PasteLogical: ylmAttr:', ylmAttr);
 		const targetXlm = JSON.parse(xlmAttr);
 		const targetYlm = JSON.parse(ylmAttr);
 
 		const logicalPoints = clipboardData.element.logicalPoints;
-		const d = logicalPoints.map((pt: any, i: number) => {
-			const userX = this._fromLogicalX(pt.x, targetXlm[0], targetXlm[1], targetXlm[2], targetXlm[3]);
-			const userY = this._fromLogicalY(pt.y, targetYlm[0], targetYlm[1], targetYlm[2], targetYlm[3]);
-			return (i === 0 ? 'M' : 'L') + `${userX} ${userY}`;
+		console.log('SVGX PasteLogical: logicalPoints:', logicalPoints);
+
+		let textX = 0;
+		let textY = 0;
+		const format = (v: number) => Number(v.toFixed(2));
+		const newPathData = logicalPoints.map((pt: any, i: number) => {
+			const visualX = format(this._fromLogicalX(pt.x, targetXlm[0], targetXlm[1], targetXlm[2], targetXlm[3]));
+			const visualY = format(this._fromLogicalY(pt.y, targetYlm[0], targetYlm[1], targetYlm[3], targetYlm[2]));
+			if (i === 0) {
+				textX = visualX;
+				textY = visualY;
+			}
+			return (i === 0 ? 'M ' : 'L ') + visualX + ' ' + visualY;
 		}).join(' ');
+		console.log('SVGX: Pasting new path with data:', newPathData);
 
-		const pasteContainer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-		pasteContainer.setAttribute('class', 'pasted-element');
+		const pasteContainer = targetSvg.append('g');
 
-		const newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		newPath.setAttribute('d', d);
-		Object.keys(clipboardData.element.attributes).forEach(key => {
-			newPath.setAttribute(key, clipboardData.element.attributes[key]);
-		});
+		// add a new path
+		const pathId = 'svgx-pasted-path-' + Date.now();
 
-		pasteContainer.appendChild(newPath);
+		pasteContainer.append('path')
+			.attr('id', pathId)
+			.attr('d', newPathData)
+			.attr('style', 'stroke:#ff0000; stroke-width:2; fill:none;');
 
-		const legendContainer = this.svgRoot.querySelector('g[id*="legend"]');
-		if (legendContainer) {
-			clipboardData.legendData.forEach((legend: any) => {
-				const alreadyExists = legendContainer.querySelector(`text[lc_legend_id="${legend.id}"]`);
-				if (!alreadyExists) {
-					legendContainer.insertAdjacentHTML('beforeend', legend.definitionElement);
-					legend.instanceElements.forEach((inst: string) => {
-						legendContainer.insertAdjacentHTML('beforeend', inst);
-					});
-				}
-			});
+		// Use getElementById for verification
+		const pathElement = document.getElementById(pathId);
+		if (pathElement) {
+			console.log('SVGX PASTE VERIFICATION: Pasted path outerHTML:', pathElement.outerHTML);
+			svgxFlashElement(pathId);
 		} else {
-			clipboardData.legendData.forEach((legend: any) => {
-				pasteContainer.insertAdjacentHTML('beforeend', legend.definitionElement);
-				legend.instanceElements.forEach((inst: string) => {
-					pasteContainer.insertAdjacentHTML('beforeend', inst);
-				});
-			});
+			console.warn('SVGX PASTE VERIFICATION: Path not found by ID:', pathId);
+			svgxShowStatus('Warning: Pasted path not found in DOM.');
 		}
 
-		this.svgRoot.appendChild(pasteContainer);
+		if (clipboardData.legendData && clipboardData.legendData.length > 0) {
+			const legendInfo = clipboardData.legendData[0];
+
+			const legendText = legendInfo.definitionText || 'legend_item';
+			console.log('SVGX: Pasting legend text:', legendText);
+
+			const legendContainer = targetSvg.select('g[id*="legend"]');
+
+			if (!legendContainer.empty()) {
+				const yOffset = (legendContainer.selectAll('text').size() + 1) * 20;
+				legendContainer.append('text')
+					.attr('x', 10)
+					.attr('y', yOffset)
+					.text(legendText);
+			} else {
+				pasteContainer.append('text')
+					.attr('x', textX + 20)
+					.attr('y', textY + 10)
+					.attr('fill', '#ff0000')
+					.style('font-size', '12px')
+					.text(legendText);
+			}
+		}
+
 		svgxShowStatus('Logical data pasted!', 2000);
 		return this.svgRoot.outerHTML;
 	}
