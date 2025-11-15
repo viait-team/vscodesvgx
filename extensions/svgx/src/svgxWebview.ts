@@ -229,7 +229,7 @@ function svgxFlashElement(elementSelector: string): void {
 
 class SvgxLogicalMapping {
 
-	public has_x_startDate: boolean = true;
+	public has_x_startDate: boolean = false;
 	public x_startDate: Date = new Date('9/12/2025');
 	public x_scale_days: number = 365;
 
@@ -287,6 +287,21 @@ class SvgxLogicalMapping {
 		return this._convert_date_to_ticks(targetDate);
 	}
 
+	private _convert_ticks_to_date(ticks: number): Date {
+		const EPOCH_DIFF_DAYS = 719163;
+		const EPOCH_DIFF_SECONDS = EPOCH_DIFF_DAYS * 86400;
+		const TICKS_PER_SECOND = 10000000;
+		const total_seconds = Math.floor(ticks / TICKS_PER_SECOND);
+		const seconds_from_unix_epoch = total_seconds - EPOCH_DIFF_SECONDS;
+		return new Date(seconds_from_unix_epoch * 1000);
+	}
+
+	public fromLogicalTickX(d_ticks: number): number {
+		const targetDate = this._convert_ticks_to_date(d_ticks);
+		const milliseconds_offset = targetDate.getTime() - this.x_startDate.getTime();
+		const dayOffset = milliseconds_offset / (24 * 60 * 60 * 1000);
+		return dayOffset / this.x_scale_days;
+	}
 	//#endregion
 }
 
@@ -298,7 +313,32 @@ class SvgxLogicalOperations {
 	constructor(svgElement: SVGSVGElement) {
 		this.svgRoot = svgElement;
 		this.svgxLogicalMapping = new SvgxLogicalMapping();
+		this.initializeLocalMapping();
 		this.initializeSelectionHandling();
+	}
+
+	public initializeLocalMapping(): void {
+
+		// Read the custom attributes from the SVG element
+		const startDateAttr = this.svgRoot.getAttribute('x_startDate');
+		const scaleDaysAttr = this.svgRoot.getAttribute('x_scale_days');
+
+		let startDate = null;
+		let scaleDays = 365;
+
+		// Parse the start date attribute
+		if (startDateAttr) {
+			startDate = new Date(startDateAttr);
+			this.svgxLogicalMapping.x_startDate = startDate;
+			this.svgxLogicalMapping.has_x_startDate = true;
+		}
+
+		// Parse the scale days attribute to a number
+		if (scaleDaysAttr) {
+			scaleDays = parseInt(scaleDaysAttr, 10);
+			this.svgxLogicalMapping.x_scale_days = scaleDays;
+		}
+
 	}
 
 	public initializeSelectionHandling(): void {
@@ -529,6 +569,9 @@ class SvgxLogicalOperations {
 	}
 
 	private _fromLogicalX(d: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
+		if (this.svgxLogicalMapping.has_x_startDate) {
+			d = this.svgxLogicalMapping.fromLogicalTickX(d);
+		}
 		return this.svgxLogicalMapping.fromLogicalX(d, d_min, d_max, v_min, v_max);
 	}
 
