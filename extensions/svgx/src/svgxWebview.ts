@@ -486,6 +486,8 @@ class SvgxLogicalOperations {
 			const legendInfo = clipboardData.legendData[0];
 
 			const legendText = legendInfo.definitionText || 'legend_item';
+			const lc_legend_id = this._generateLcId(legendText);
+			pathElement?.setAttribute('lc_legend_ref', lc_legend_id);
 			console.log('SVGX: Pasting legend text:', legendText);
 
 			const legendContainer = targetSvg.select('g[id*="legend"]');
@@ -495,13 +497,17 @@ class SvgxLogicalOperations {
 				legendContainer.append('text')
 					.attr('x', 10)
 					.attr('y', yOffset)
+					.attr('fill', '#ff0000')
+					.style('font-size', '12px')
+					.attr('lc_legend_id', lc_legend_id)
 					.text(legendText);
 			} else {
 				pasteContainer.append('text')
 					.attr('x', textX + 20)
-					.attr('y', textY + 10)
+					.attr('y', textY + 30)
 					.attr('fill', '#ff0000')
 					.style('font-size', '12px')
+					.attr('lc_legend_id', lc_legend_id)
 					.text(legendText);
 			}
 		}
@@ -530,6 +536,9 @@ class SvgxLogicalOperations {
 		return this.svgxLogicalMapping.fromLogicalY(d, d_min, d_max, v_min, v_max);
 	}
 
+	private _generateLcId(text: string): string {
+		return text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+	}
 }
 
 // initial ready notification
