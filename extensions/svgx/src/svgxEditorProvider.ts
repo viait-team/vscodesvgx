@@ -149,19 +149,19 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		});
 	}
 
+
 	private _updateDocument(document: SvgxDocument, newSvgString: string) {
-		const edit = new vscode.WorkspaceEdit();
+		// Update the internal DOM object of your custom document.
+		(document as any)._dom = new DOMParser().parseFromString(newSvgString, 'application/xml');
 
-		const currentContent = new TextDecoder().decode(document.documentData);
-		const lineCount = currentContent.split('\n').length;
-
-		edit.replace(
-			document.uri,
-
-			new vscode.Range(0, 0, lineCount, 0),
-			newSvgString
-		);
-		vscode.workspace.applyEdit(edit);
+		// Fire the event to notify VS Code that the document has been edited.
+		// This is the correct way to make the document "dirty".
+		this._onDidChangeCustomDocument.fire({
+			document,
+			// undo/redo can be implemented later if needed
+			undo: async () => { /* no-op */ },
+			redo: async () => { /* no-op */ },
+		});
 	}
 
 	private _makeEdit(document: SvgxDocument, newContent: string) {
