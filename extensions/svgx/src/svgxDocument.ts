@@ -9,8 +9,10 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 export class SvgxDocument implements vscode.CustomDocument {
 
 	private readonly _uri: vscode.Uri;
-
 	private _dom: Document;
+
+	private readonly _undoStack: Document[] = [];
+	private readonly _redoStack: Document[] = [];
 
 	private constructor(
 		uri: vscode.Uri,
@@ -28,12 +30,42 @@ export class SvgxDocument implements vscode.CustomDocument {
 
 	public get uri() { return this._uri; }
 
-	public get dom(): Document { return this._dom; }
-
 	public get documentData(): Uint8Array {
 		const serializer = new XMLSerializer();
 		const content = serializer.serializeToString(this._dom);
 		return new TextEncoder().encode(content);
+	}
+
+	public update(newDom: Document) {
+		this._undoStack.push(this._dom);
+		this._redoStack.length = 0; // Clear the redo stack
+		this._dom = newDom;
+	}
+
+	public undo(): Document | undefined {
+		if (this._undoStack.length === 0) {
+			return undefined;
+		}
+
+		this._redoStack.push(this._dom);
+		const lastState = this._undoStack.pop();
+		if (lastState) {
+			this._dom = lastState;
+		}
+		return this._dom;
+	}
+
+	public redo(): Document | undefined {
+		if (this._redoStack.length === 0) {
+			return undefined;
+		}
+
+		this._undoStack.push(this._dom);
+		const nextState = this._redoStack.pop();
+		if (nextState) {
+			this._dom = nextState;
+		}
+		return this._dom;
 	}
 
 	private readonly _onDidDispose = new vscode.EventEmitter<void>();

@@ -6,16 +6,13 @@
 
 import * as vscode from 'vscode';
 import { SvgxDocument } from './svgxDocument';
-import { DOMParser } from '@xmldom/xmldom';
-// import { SvgxClipboardService } from './svgxClipboardService';
-// import { SvgxClipboardData } from './types';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
 export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocument> {
 
 	public static register(context: vscode.ExtensionContext): vscode.Disposable {
 		console.log('SVGX Extension: Registering SvgxEditorProvider');
 
-		// --- FIX: The command handlers are now simplified and directly use the static activeWebviewPanel ---
 		const copyCommand = vscode.commands.registerCommand('svgx.copyLogical', () => {
 			if (SvgxEditorProvider.activeWebviewPanel) {
 				console.log('SVGX CL 1/8: CopyLogical Command is invoked...');
@@ -50,10 +47,9 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 			}
 		});
 		context.subscriptions.push(pasteCommand);
-		// --- END FIX ---
 
-		// const provider = new SvgxEditorProvider(context, clipboardService);
 		const provider = new SvgxEditorProvider(context);
+
 		const providerRegistration = vscode.window.registerCustomEditorProvider(SvgxEditorProvider.viewType, provider, {
 			webviewOptions: {
 				retainContextWhenHidden: true,
@@ -66,17 +62,11 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 	}
 
 	private static readonly viewType = 'svgx.editor';
-	// --- FIX: Directly track the active webview panel, not the provider or text editor ---
 	private static activeWebviewPanel: vscode.WebviewPanel | undefined;
-	// --- END FIX ---
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		// private readonly _clipboardService: SvgxClipboardService
 	) { }
-
-	// --- REMOVED: The _copyLogical and _pasteLogical instance methods are no longer needed,
-	// as the logic is now self-contained in the static command registration.
 
 	async openCustomDocument(
 		uri: vscode.Uri,
@@ -93,9 +83,6 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		_token: vscode.CancellationToken
 	): Promise<void> {
 
-		// SvgxEditorProvider.activeWebviewPanel = webviewPanel;
-
-		// --- FIX: Use onDidChangeViewState to reliably track the active panel ---
 		webviewPanel.onDidChangeViewState(e => {
 			if (e.webviewPanel.active) {
 				SvgxEditorProvider.activeWebviewPanel = e.webviewPanel;
@@ -106,9 +93,7 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 				SvgxEditorProvider.activeWebviewPanel = undefined;
 			}
 		});
-		// --- END FIX ---
 
-		// Setup webview
 		webviewPanel.webview.options = {
 			enableScripts: true,
 		};
@@ -117,7 +102,6 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		webviewPanel.webview.onDidReceiveMessage(e => {
 			switch (e.type) {
 				case 'ready': {
-
 					const xml = new TextDecoder().decode(document.documentData);
 					const isDark = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
 					webviewPanel.webview.postMessage({
@@ -127,10 +111,6 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 					});
 					return;
 				}
-				case 'edit':
-					this._makeEdit(document, e.content);
-					return;
-
 				case 'copyDataResponse':
 					if (e.payload) {
 						vscode.env.clipboard.writeText(JSON.stringify(e.payload, null, 2));
@@ -142,42 +122,37 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 
 				case 'documentUpdate':
 					if (e.payload) {
-						this._updateDocument(document, e.payload);
+						this._updateDocument(document, e.payload, webviewPanel);
 					}
 					return;
 			}
 		});
 	}
 
-
-	private _updateDocument(document: SvgxDocument, newSvgString: string) {
-		// Update the internal DOM object of your custom document.
-		(document as any)._dom = new DOMParser().parseFromString(newSvgString, 'application/xml');
-
-		// Fire the event to notify VS Code that the document has been edited.
-		// This is the correct way to make the document "dirty".
-		this._onDidChangeCustomDocument.fire({
-			document,
-			// undo/redo can be implemented later if needed
-			undo: async () => { /* no-op */ },
-			redo: async () => { /* no-op */ },
-		});
-	}
-
-	private _makeEdit(document: SvgxDocument, newContent: string) {
-		const newDom = new DOMParser().parseFromString(newContent, 'application/xml');
-		(document as any)._dom = newDom;
+	private _updateDocument(document: SvgxDocument, newSvgString: string, webviewPanel: vscode.WebviewPanel) {
+		const newDom = new DOMParser().parseFromString(newSvgString, 'application/xml');
+		document.update(newDom);
 
 		this._onDidChangeCustomDocument.fire({
 			document,
-			undo: async () => { /* Not implemented */ },
-			redo: async () => { /* Not implemented */ },
+			undo: async () => {
+				const restoredDom = document.undo();
+				if (restoredDom) {
+					const content = new XMLSerializer().serializeToString(restoredDom);
+					webviewPanel.webview.postMessage({ type: 'update', text: content });
+				}
+			},
+			redo: async () => {
+				const restoredDom = document.redo();
+				if (restoredDom) {
+					const content = new XMLSerializer().serializeToString(restoredDom);
+					webviewPanel.webview.postMessage({ type: 'update', text: content });
+				}
+			},
 		});
 	}
 
 	private async getHtmlForWebview(webview: vscode.Webview): Promise<string> {
-		// --- SVGX: Nonce removed in the previewWebview.html for default CSP policy ---
-		// It is not used currently, but we kept here for future reference.
 		const nonce = getNonce();
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
 			this.context.extensionUri, 'media', 'svgxWebview.js'));
@@ -206,7 +181,8 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 
 	public async revertCustomDocument(document: SvgxDocument, _cancellation: vscode.CancellationToken): Promise<void> {
 		const diskContent = await vscode.workspace.fs.readFile(document.uri);
-		(document as any)._dom = new DOMParser().parseFromString(new TextDecoder().decode(diskContent), 'application/xml');
+		const dom = new DOMParser().parseFromString(new TextDecoder().decode(diskContent), 'application/xml');
+		document.update(dom);
 	}
 
 	public async backupCustomDocument(document: SvgxDocument, context: vscode.CustomDocumentBackupContext, cancellation: vscode.CancellationToken): Promise<vscode.CustomDocumentBackup> {
