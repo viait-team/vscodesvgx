@@ -229,8 +229,8 @@ function svgxFlashElement(elementSelector: string): void {
 
 class SvgxLogicalMapping {
 
-	public has_x_startDate: boolean = false;
-	public x_startDate: Date = new Date('9/12/2025');
+	public has_x_start_date: boolean = true;
+	public x_start_date: Date = new Date('9/12/2025');
 	public x_scale_days: number = 365;
 
 	constructor() { }
@@ -283,7 +283,7 @@ class SvgxLogicalMapping {
 	public toLogicalTickX(dx: number): number {
 		const dayOffset = dx * this.x_scale_days;
 		const milliseconds_offset = dayOffset * 24 * 60 * 60 * 1000;
-		const targetDate = new Date(this.x_startDate.getTime() + milliseconds_offset);
+		const targetDate = new Date(this.x_start_date.getTime() + milliseconds_offset);
 		return this._convert_date_to_ticks(targetDate);
 	}
 
@@ -298,10 +298,11 @@ class SvgxLogicalMapping {
 
 	public fromLogicalTickX(d_ticks: number): number {
 		const targetDate = this._convert_ticks_to_date(d_ticks);
-		const milliseconds_offset = targetDate.getTime() - this.x_startDate.getTime();
+		const milliseconds_offset = targetDate.getTime() - this.x_start_date.getTime();
 		const dayOffset = milliseconds_offset / (24 * 60 * 60 * 1000);
 		return dayOffset / this.x_scale_days;
 	}
+
 	//#endregion
 }
 
@@ -313,32 +314,7 @@ class SvgxLogicalOperations {
 	constructor(svgElement: SVGSVGElement) {
 		this.svgRoot = svgElement;
 		this.svgxLogicalMapping = new SvgxLogicalMapping();
-		this.initializeLocalMapping();
 		this.initializeSelectionHandling();
-	}
-
-	public initializeLocalMapping(): void {
-
-		// Read the custom attributes from the SVG element
-		const startDateAttr = this.svgRoot.getAttribute('x_startDate');
-		const scaleDaysAttr = this.svgRoot.getAttribute('x_scale_days');
-
-		let startDate = null;
-		let scaleDays = 365;
-
-		// Parse the start date attribute
-		if (startDateAttr) {
-			startDate = new Date(startDateAttr);
-			this.svgxLogicalMapping.x_startDate = startDate;
-			this.svgxLogicalMapping.has_x_startDate = true;
-		}
-
-		// Parse the scale days attribute to a number
-		if (scaleDaysAttr) {
-			scaleDays = parseInt(scaleDaysAttr, 10);
-			this.svgxLogicalMapping.x_scale_days = scaleDays;
-		}
-
 	}
 
 	public initializeSelectionHandling(): void {
@@ -369,11 +345,42 @@ class SvgxLogicalOperations {
 		});
 	}
 
+	public setupLocalMapping(): void {
+
+		this.svgxLogicalMapping.has_x_start_date = false;
+		// Read the custom attributes from the SVG element
+		const startDateAttr = this.svgRoot.getAttribute('x_start_date');
+		const scaleDaysAttr = this.svgRoot.getAttribute('x_scale_days');
+		console.log('startDateAttr:', startDateAttr, 'scaleDaysAttr:', scaleDaysAttr);
+
+		// Parse the start date attribute
+		if (startDateAttr) {
+			const dateObject: Date = new Date(startDateAttr);
+			console.log('startDateAttr:', startDateAttr, 'dateObject:', dateObject);
+			this.svgxLogicalMapping.x_start_date = dateObject;
+			this.svgxLogicalMapping.has_x_start_date = true;
+		}
+
+		// Parse the scale days attribute to a number
+		if (scaleDaysAttr) {
+			const scaleDays = parseInt(scaleDaysAttr, 10);
+			this.svgxLogicalMapping.x_scale_days = scaleDays;
+		}
+
+	}
+
 	public getLogicalCopyData(): object | null {
 		if (!this.currentlySelectedElement) {
 			svgxShowStatus('No path selected to copy.', 2000);
 			return null;
 		}
+
+		//
+		this.setupLocalMapping();
+		const is_logical_mapping_local = this.svgRoot.getAttribute('is_logical_mapping_local');
+		const isLogicalMappingLocal = is_logical_mapping_local !== null && is_logical_mapping_local === 'true';
+		console.log('SVGX CopyLogical: isLogicalMappingLocal:', isLogicalMappingLocal);
+
 
 		const element = this.currentlySelectedElement;
 
@@ -410,7 +417,11 @@ class SvgxLogicalOperations {
 				pt.y = points[1];
 
 				// const transformedPt = pt.matrixTransform(ctm);
-				const transformedPt = pt;
+				let transformedPt = pt;
+				if (isLogicalMappingLocal === false) {
+					transformedPt = pt.matrixTransform(ctm);
+				}
+
 				const logicalX = this._toLogicalX(transformedPt.x, xlm[0], xlm[1], xlm[2], xlm[3]);
 				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm[3], ylm[2]);
 				logicalPoints.push({ x: logicalX, y: logicalY });
@@ -471,6 +482,8 @@ class SvgxLogicalOperations {
 			svgxShowStatus('Error: D3.js not loaded. Cannot paste.');
 			return null;
 		}
+		//
+		this.setupLocalMapping();
 
 		const targetSvg = d3.select(this.svgRoot);
 
@@ -558,7 +571,7 @@ class SvgxLogicalOperations {
 
 	private _toLogicalX(v: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
 		let dx = this.svgxLogicalMapping.toLogicalX(v, d_min, d_max, v_min, v_max);
-		if (this.svgxLogicalMapping.has_x_startDate) {
+		if (this.svgxLogicalMapping.has_x_start_date) {
 			dx = this.svgxLogicalMapping.toLogicalTickX(dx);
 		}
 		return dx;
@@ -569,7 +582,7 @@ class SvgxLogicalOperations {
 	}
 
 	private _fromLogicalX(d: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
-		if (this.svgxLogicalMapping.has_x_startDate) {
+		if (this.svgxLogicalMapping.has_x_start_date) {
 			d = this.svgxLogicalMapping.fromLogicalTickX(d);
 		}
 		return this.svgxLogicalMapping.fromLogicalX(d, d_min, d_max, v_min, v_max);
