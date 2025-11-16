@@ -11,10 +11,10 @@ export class XmlDocumentRenderer {
 	public async renderDocument(document: vscode.TextDocument, webview: vscode.Webview): Promise<string> {
 		const fileContent = document.getText();
 
-		if (document.fileName.toLowerCase().endsWith('.svg')) {
+		const lowerCaseFileName = document.fileName.toLowerCase();
+		if (lowerCaseFileName.endsWith('.svg') || lowerCaseFileName.endsWith('.svgx')) {
 			return this.renderSvgPreview(fileContent, webview);
 		}
-
 		return await this.renderXmlPreview(fileContent, webview, document.uri);
 	}
 

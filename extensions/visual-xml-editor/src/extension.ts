@@ -39,7 +39,8 @@ export function activate(extensionContext: vscode.ExtensionContext) {
 		vscode.window.onDidChangeTextEditorSelection((event) => {
 			// Only sync for SVG/XML files
 			if (event.textEditor.document.languageId === 'xml' ||
-				event.textEditor.document.fileName.endsWith('.svg')) {
+				event.textEditor.document.fileName.endsWith('.svg') ||
+				event.textEditor.document.fileName.endsWith('.svgx')) {
 				autoSyncEditorToPreview(previewManager, event.textEditor, event.selections[0]);
 			}
 		})

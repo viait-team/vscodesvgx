@@ -32,6 +32,9 @@
         "selector": [
           {
             "filenamePattern": "*.svgx"
+          },
+          {
+            "filenamePattern": "*.svg"
           }
         ],
         "priority": "default"
