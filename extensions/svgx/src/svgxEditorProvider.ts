@@ -27,6 +27,11 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		});
 		context.subscriptions.push(pasteCommand);
 
+		const encodeCommand = vscode.commands.registerCommand('svgx.encodePathLegend', () => {
+			provider.encodePathLegend(); // Call the new instance method
+		});
+		context.subscriptions.push(encodeCommand);
+
 		const providerRegistration = vscode.window.registerCustomEditorProvider(SvgxEditorProvider.viewType, provider, {
 			webviewOptions: {
 				retainContextWhenHidden: true,
@@ -35,7 +40,7 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 		});
 
 		console.log('SVGX Extension: SvgxEditorProvider registered successfully');
-		return vscode.Disposable.from(providerRegistration, copyCommand, pasteCommand);
+		return vscode.Disposable.from(providerRegistration, copyCommand, pasteCommand, encodeCommand);
 	}
 
 	private static readonly viewType = 'svgx.editor';
@@ -85,6 +90,17 @@ export class SvgxEditorProvider implements vscode.CustomEditorProvider<SvgxDocum
 			console.warn('SVGX: Paste called but no active webview or logical data was found.');
 		}
 	}
+
+	private encodePathLegend(): void {
+		const activePanel = Array.from(this.webviewPanels).find(panel => panel.active);
+		if (activePanel) {
+			console.log('SVGX EPL 1/2: encodePathLegend Command invoked...');
+			activePanel.webview.postMessage({ type: 'encodePathLegendRequest' });
+		} else {
+			vscode.window.showWarningMessage('No active SVGX editor to run Encode Path Legend.');
+		}
+	}
+
 
 	async openCustomDocument(
 		uri: vscode.Uri,

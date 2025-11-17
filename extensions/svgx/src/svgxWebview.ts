@@ -72,6 +72,15 @@ window.addEventListener('message', (event: MessageEvent) => {
 				svgxSafePostMessage({ type: 'documentUpdate', payload: newSvgString });
 			}
 			break;
+		case 'encodePathLegendRequest':
+			if (typedWindow.svgxLogicalOps) {
+				const newSvgString = typedWindow.svgxLogicalOps.encodePathLegend();
+				// Only send an update if the document was actually changed
+				if (newSvgString) {
+					svgxSafePostMessage({ type: 'documentUpdate', payload: newSvgString });
+				}
+			}
+			break;
 	}
 });
 
@@ -309,7 +318,8 @@ class SvgxLogicalMapping {
 class SvgxLogicalOperations {
 	private svgRoot: SVGSVGElement;
 	private svgxLogicalMapping: SvgxLogicalMapping;
-	private currentlySelectedElement: SVGPathElement | null = null;
+	private selectedPath: SVGPathElement | null = null;
+	private selectedText: SVGTextElement | null = null;
 
 	constructor(svgElement: SVGSVGElement) {
 		this.svgRoot = svgElement;
@@ -318,30 +328,68 @@ class SvgxLogicalOperations {
 	}
 
 	public initializeSelectionHandling(): void {
-		const paths = this.svgRoot.querySelectorAll('path');
-		paths.forEach(path => {
-			path.addEventListener('click', (event) => {
-				event.stopPropagation();
-				if (this.currentlySelectedElement) {
-					this.currentlySelectedElement.classList.remove('selected');
-				}
-				this.currentlySelectedElement = path;
-				this.currentlySelectedElement.classList.add('selected');
-				const styleId = 'svgx-selection-style';
-				if (!document.getElementById(styleId)) {
-					const style = document.createElement('style');
-					style.id = styleId;
-					style.innerHTML = `
-						.selected {
+		const styleId = 'svgx-selection-style';
+		if (!document.getElementById(styleId)) {
+			const style = document.createElement('style');
+			style.id = styleId;
+			style.innerHTML = `
+						.path-selected {
 							stroke: #00a8ff !important;
 							stroke-width: 3px !important;
 							stroke-dasharray: 5, 5;
 						}
+						.text-selected {
+							outline: 2px dashed #00a8ff !important;
+							fill: #00a8ff !important;
+						}
 					`;
-					document.head.appendChild(style);
+			document.head.appendChild(style);
+		}
+
+		const selectableElements = this.svgRoot.querySelectorAll('path, text');
+
+		selectableElements.forEach(element => {
+			element.addEventListener('click', (event) => {
+				event.stopPropagation();
+				const target = element as SVGElement;
+
+				if (target.tagName.toLowerCase() === 'path') {
+					if (this.selectedPath) {
+						this.selectedPath.classList.remove('path-selected');
+					}
+					this.selectedPath = target as SVGPathElement;
+					this.selectedPath.classList.add('path-selected');
+
+				} else if (target.tagName.toLowerCase() === 'text') {
+					if (this.selectedText) {
+						this.selectedText.classList.remove('text-selected');
+					}
+					this.selectedText = target as SVGTextElement;
+					this.selectedText.classList.add('text-selected');
 				}
-				svgxShowStatus('Path selected for logical copy.', 1500);
+
+				if (this.selectedPath && this.selectedText) {
+					svgxShowStatus('Path and Text selected. Ready for Encode.', 2000);
+				} else if (this.selectedPath) {
+					svgxShowStatus('Path selected. Ready for Logical Copy.', 1500);
+				} else if (this.selectedText) {
+					svgxShowStatus('Text selected.', 1500);
+				}
 			});
+		});
+
+		this.svgRoot.addEventListener('click', (event) => {
+			if (event.target === this.svgRoot) {
+				if (this.selectedPath) {
+					this.selectedPath.classList.remove('path-selected');
+					this.selectedPath = null;
+				}
+				if (this.selectedText) {
+					this.selectedText.classList.remove('text-selected');
+					this.selectedText = null;
+				}
+				svgxShowStatus('Selection cleared.', 1500);
+			}
 		});
 	}
 
@@ -370,7 +418,7 @@ class SvgxLogicalOperations {
 	}
 
 	public getLogicalCopyData(): object | null {
-		if (!this.currentlySelectedElement) {
+		if (!this.selectedPath) {
 			svgxShowStatus('No path selected to copy.', 2000);
 			return null;
 		}
@@ -382,7 +430,7 @@ class SvgxLogicalOperations {
 		console.log('SVGX CopyLogical: isLogicalMappingLocal:', isLogicalMappingLocal);
 
 
-		const element = this.currentlySelectedElement;
+		const element = this.selectedPath;
 
 		const ctm = (element as SVGGraphicsElement).getCTM();
 		if (!ctm) {
@@ -569,6 +617,63 @@ class SvgxLogicalOperations {
 		return this.svgRoot.outerHTML;
 	}
 
+
+	public encodePathLegend(): string | null {
+		// If both a path and a text are selected, run manual mode.
+		if (this.selectedPath && this.selectedText) {
+			console.log('SVGX: Path and Text selected. Running Manual Encode.');
+			return this._performManualEncoding();
+		} else {
+			// Otherwise, run auto mode.
+			console.log('SVGX: No valid selection for manual mode. Running Auto Encode.');
+			return this._performAutoEncoding();
+		}
+	}
+
+	private _performManualEncoding(): string | null {
+		// This is a safeguard, the public method already checked.
+		if (!this.selectedPath || !this.selectedText) { return null; }
+
+		const legendText = this.selectedText.textContent || 'legend';
+
+		// 1. Generate a unique ID that doesn't already exist in the document
+		const baseId = legendText.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+		let uniqueId = baseId;
+		let counter = 1;
+		while (this.svgRoot.querySelector(`[lc_legend_id="${uniqueId}"]`)) {
+			uniqueId = `${baseId}-${counter++}`;
+		}
+
+		console.log(`SVGX: Generated unique legend ID: ${uniqueId}`);
+
+		// 2. Set attributes on the selected elements
+		this.selectedText.setAttribute('lc_legend_id', uniqueId);
+
+		// --- THIS IS THE CHANGE ---
+		// No longer an array. Just a direct string reference.
+		this.selectedPath.setAttribute('lc_legend_ref', uniqueId);
+
+		// 3. Clear selection and provide user feedback
+		svgxShowStatus(`Associated legend "${uniqueId}" successfully.`, 2500); // Updated status message
+		this.selectedPath.classList.remove('path-selected');
+		this.selectedText.classList.remove('text-selected');
+		this.selectedPath = null;
+		this.selectedText = null;
+
+		// 4. Return the modified SVG content so the extension can save it
+		return this.svgRoot.outerHTML;
+	}
+
+	private _performAutoEncoding(): string | null {
+		// For now, just inform the user that this is not yet implemented.
+		svgxShowStatus('Automatic Path Legend encoding is not yet implemented.', 3000);
+
+		// Return null because we didn't change the document.
+		return null;
+	}
+
+
+	// --- Logical Mapping Helpers ---
 	private _toLogicalX(v: number, d_min: number, d_max: number, v_min: number, v_max: number): number {
 		let dx = this.svgxLogicalMapping.toLogicalX(v, d_min, d_max, v_min, v_max);
 		if (this.svgxLogicalMapping.has_x_start_date) {

@@ -50,6 +50,11 @@
         "command": "svgx.pasteLogical",
         "title": "Paste Logical",
         "category": "SVGX"
+      },
+      {
+          "command": "svgx.encodePathLegend",
+          "title": "Associate Legend",
+          "category": "SVGX"
       }
     ],
     "menus": {
@@ -63,6 +68,11 @@
           "when": "activeCustomEditorId == 'svgx.editor'",
           "command": "svgx.pasteLogical",
           "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.encodePathLegend",
+          "group": "navigation"
         }
       ],
       "webview/context": [
@@ -74,6 +84,11 @@
         {
           "when": "activeCustomEditorId == 'svgx.editor'",
           "command": "svgx.pasteLogical",
+          "group": "navigation"
+        },
+        {
+          "when": "activeCustomEditorId == 'svgx.editor'",
+          "command": "svgx.encodePathLegend",
           "group": "navigation"
         }
       ]
