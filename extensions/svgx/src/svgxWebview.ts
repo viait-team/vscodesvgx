@@ -325,7 +325,26 @@ class SvgxEncodePathLegend {
 	}
 
 	public associatePathToLegends(): string | null {
-		console.log("SVGX: Starting automatic association with color and distance checks.");
+		console.log("SVGX: Starting automatic legend association...");
+
+		// --- ALGORITHM 1: Attempt association by Proximity + Color ---
+		if (this._associateByProximity()) {
+			console.log("SVGX: Success using Proximity + Color algorithm.");
+			return this._applyAssociations();
+		}
+
+		// --- ALGORITHM 2: Fallback to association by Style ---
+		if (this._associateByStyle()) {
+			console.log("SVGX: Success using Style Matching algorithm.");
+			return this._applyAssociations();
+		}
+
+		console.log("SVGX: All automatic association algorithms failed to find matches.");
+		return null;
+	}
+
+	private _associateByProximity(): boolean {
+		console.log("SVGX: Attempting association by proximity with color and distance checks.");
 
 		const candidateTexts: SVGTextElement[] = [];
 		const legendMarkerPaths = new Set<SVGElement>();
@@ -348,8 +367,7 @@ class SvgxEncodePathLegend {
 		});
 
 		if (candidatePaths.length === 0 || candidateTexts.length < 2) {
-			console.log("SVGX: Not enough candidate paths or texts to perform matching.");
-			return null;
+			return false;
 		}
 
 		const getCentroid = (el: SVGElement) => {
@@ -365,84 +383,126 @@ class SvgxEncodePathLegend {
 		const pathInfo = new Map(candidatePaths.map(p => [p, { centroid: getCentroid(p), color: getColor(p) }]));
 		const textInfo = new Map(candidateTexts.map(t => [t, { centroid: getCentroid(t), color: getColor(t) }]));
 
-		const distance = (p1: { x: number, y: number }, p2: { x: number, y: number }) => {
-			return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-		};
+		const distance = (p1: { x: number, y: number }, p2: { x: number, y: number }) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
 		let totalX = 0, totalY = 0;
-		for (const info of textInfo.values()) {
-			totalX += info.centroid.x;
-			totalY += info.centroid.y;
-		}
+		textInfo.forEach(info => { totalX += info.centroid.x; totalY += info.centroid.y; });
 		const textBlockCentroid = { x: totalX / candidateTexts.length, y: totalY / candidateTexts.length };
 
 		let totalDistance = 0;
-		for (const info of textInfo.values()) {
-			totalDistance += distance(info.centroid, textBlockCentroid);
-		}
+		textInfo.forEach(info => totalDistance += distance(info.centroid, textBlockCentroid));
 		const distanceThreshold = totalDistance / candidateTexts.length;
-		console.log(`SVGX: Calculated legend distance threshold: ${distanceThreshold.toFixed(2)}`);
 
 		const pathBestMatches = new Map<SVGPathElement, SVGTextElement>();
-		for (const path of candidatePaths) {
+		pathInfo.forEach((pathData, path) => {
 			let closestText: SVGTextElement | null = null;
 			let minDistance = Infinity;
-			const pathData = pathInfo.get(path)!;
-
-			for (const text of candidateTexts) {
-				const textData = textInfo.get(text)!;
-				if (pathData.color !== textData.color || pathData.color === 'none') {
-					continue;
+			textInfo.forEach((textData, text) => {
+				if (pathData.color === textData.color && pathData.color !== 'none') {
+					const dist = distance(pathData.centroid, textData.centroid);
+					if (dist < minDistance) {
+						minDistance = dist;
+						closestText = text;
+					}
 				}
-				const dist = distance(pathData.centroid, textData.centroid);
-				if (dist < minDistance) {
-					minDistance = dist;
-					closestText = text;
-				}
-			}
-			if (closestText) {
-				pathBestMatches.set(path, closestText);
-			}
-		}
+			});
+			if (closestText) pathBestMatches.set(path, closestText);
+		});
 
 		const textBestMatches = new Map<SVGTextElement, SVGPathElement>();
-		for (const text of candidateTexts) {
+		textInfo.forEach((textData, text) => {
 			let closestPath: SVGPathElement | null = null;
 			let minDistance = Infinity;
-			const textData = textInfo.get(text)!;
-
-			for (const path of candidatePaths) {
-				const pathData = pathInfo.get(path)!;
-				if (textData.color !== pathData.color || textData.color === 'none') {
-					continue;
+			pathInfo.forEach((pathData, path) => {
+				if (textData.color === pathData.color && textData.color !== 'none') {
+					const dist = distance(textData.centroid, pathData.centroid);
+					if (dist < minDistance) {
+						minDistance = dist;
+						closestPath = path;
+					}
 				}
-				const dist = distance(textData.centroid, pathData.centroid);
-				if (dist < minDistance) {
-					minDistance = dist;
-					closestPath = path;
-				}
-			}
-			if (closestPath) {
-				textBestMatches.set(text, closestPath);
-			}
-		}
+			});
+			if (closestPath) textBestMatches.set(text, closestPath);
+		});
 
-		for (const [path, text] of pathBestMatches.entries()) {
+		pathBestMatches.forEach((text, path) => {
 			const isReciprocal = textBestMatches.get(text) === path;
 			const actualDistance = distance(pathInfo.get(path)!.centroid, textInfo.get(text)!.centroid);
-
 			if (isReciprocal && actualDistance < distanceThreshold) {
 				this.successfulAssociations.set(path, text);
 			}
+		});
+
+		return this.successfulAssociations.size > 0;
+	}
+
+	private _associateByStyle(): boolean {
+		console.log("SVGX: Attempting association by style (group-based logic).");
+
+		// Step 1 & 2: Identify Legend Groups and create a profile for each.
+		const legendProfiles: { textEl: SVGTextElement, style: any }[] = [];
+		const legendMarkerPaths = new Set<SVGElement>();
+
+		this.svgRoot.querySelectorAll('g').forEach(g => {
+			const textElement = g.querySelector('text');
+			const pathElement = g.querySelector('path'); // The marker inside the group
+
+			// A group is a valid legend item if it contains both a text and a path marker.
+			if (textElement && pathElement && !textElement.hasAttribute('lc_legend_id')) {
+				const computedStyle = window.getComputedStyle(pathElement);
+				legendProfiles.push({
+					textEl: textElement,
+					style: {
+						fill: computedStyle.fill,
+						stroke: computedStyle.stroke,
+						strokeDasharray: computedStyle.strokeDasharray
+					}
+				});
+				// Mark the marker path so it isn't treated as a data path.
+				legendMarkerPaths.add(pathElement);
+			}
+		});
+
+		// Step 3: Identify Candidate Data Paths
+		const candidatePaths: SVGPathElement[] = [];
+		this.svgRoot.querySelectorAll('path').forEach(p => {
+			const d = p.getAttribute('d');
+			if (d && (d.match(/[A-Z]/gi) || []).length > 3 && !legendMarkerPaths.has(p) && !p.hasAttribute('lc_legend_ref')) {
+				candidatePaths.push(p);
+			}
+		});
+
+		if (candidatePaths.length === 0 || legendProfiles.length === 0) {
+			return false;
 		}
 
-		if (this.successfulAssociations.size > 0) {
-			console.log(`SVGX: Found ${this.successfulAssociations.size} matches passing all checks.`);
-			return this._applyAssociations();
+		const isVisible = (color: string) => color && color !== 'none' && color !== 'rgba(0, 0, 0, 0)';
+
+		// Step 4: Match data paths to legend profiles
+		for (const path of candidatePaths) {
+			const pathStyle = window.getComputedStyle(path);
+			let foundMatch = false;
+
+			for (let i = 0; i < legendProfiles.length; i++) {
+				const legend = legendProfiles[i];
+
+				// Prioritized matching: Check for fill first, then stroke.
+				if (isVisible(legend.style.fill) && legend.style.fill === pathStyle.fill) {
+					this.successfulAssociations.set(path, legend.textEl);
+					foundMatch = true;
+				} else if (isVisible(legend.style.stroke) && legend.style.stroke === pathStyle.stroke && legend.style.strokeDasharray === pathStyle.strokeDasharray) {
+					this.successfulAssociations.set(path, legend.textEl);
+					foundMatch = true;
+				}
+
+				if (foundMatch) {
+					legendProfiles.splice(i, 1); // Remove matched legend to ensure 1-to-1 mapping.
+					break; // Move to the next path.
+				}
+			}
 		}
 
-		console.log("SVGX: No matches found passing all checks (reciprocity, color, distance).");
-		return null;
+		return this.successfulAssociations.size > 0;
 	}
 
 	private _applyAssociations(): string | null {
@@ -458,7 +518,6 @@ class SvgxEncodePathLegend {
 			while (this.svgRoot.querySelector(`[lc_legend_id="${uniqueId}"]`)) {
 				uniqueId = `${baseId}-${counter++}`;
 			}
-
 			textElement.setAttribute('lc_legend_id', uniqueId);
 			pathElement.setAttribute('lc_legend_ref', uniqueId);
 		});

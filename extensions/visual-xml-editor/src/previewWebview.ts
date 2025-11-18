@@ -2,6 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+// previewWebview.ts
 
 declare const d3: any;
 
@@ -171,12 +172,31 @@ function previewSetupClickHandlers(): void {
 	}
 
 	container.addEventListener('click', (event) => {
-		const target = event.target as Element;
+		let target = event.target as Element;
 		console.log('PE: [1/8] Preview: Element clicked:', target.tagName);
 
+		// NEW FIX: If the click hits an invisible legend toggle rectangle, the actual target
+		// for selection should be the sibling <text> element within the same group. These rectangles
+		// often have non-unique attributes, leading to incorrect selections.
+		if (target.tagName.toLowerCase() === 'rect' && target.classList.contains('legendtoggle')) {
+			const parentGroup = target.parentElement;
+			if (parentGroup) {
+				const textElement = parentGroup.querySelector('text.legendtext');
+				if (textElement) {
+					console.log('Preview: Click on legendtoggle rect, retargeting to sibling text element.');
+					target = textElement; // Reassign the target to the uniquely identifiable text element
+				}
+			}
+		}
+
+		// Previous fix for <tspan> elements, which remains good practice for other SVGs.
+		if (target.tagName.toLowerCase() === 'tspan' && target.parentElement) {
+			target = target.parentElement;
+			console.log('Preview: Target was a tspan, ascended to parent text element.');
+		}
+
 		if (target) {
-			console.log('Preview: Extracting element info');
-			// Use the same extractElementInfo function as editor
+			console.log('Preview: Extracting element info from target:', target.tagName);
 			const elementInfo = extractElementInfo(target);
 			if (elementInfo) {
 				console.log('PE: [2/8] Preview: Sending syncToEditor message to extension host');
