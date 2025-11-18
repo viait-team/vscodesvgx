@@ -558,40 +558,51 @@ class SvgxLogicalOperations {
 			document.head.appendChild(style);
 		}
 
-		const selectableElements = this.svgRoot.querySelectorAll('path, text');
-
-		selectableElements.forEach(element => {
-			element.addEventListener('click', (event) => {
-				event.stopPropagation();
-				const target = element as SVGElement;
-
-				if (target.tagName.toLowerCase() === 'path') {
-					if (this.selectedPath) {
-						this.selectedPath.classList.remove('path-selected');
-					}
-					this.selectedPath = target as SVGPathElement;
-					this.selectedPath.classList.add('path-selected');
-
-				} else if (target.tagName.toLowerCase() === 'text') {
-					if (this.selectedText) {
-						this.selectedText.classList.remove('text-selected');
-					}
-					this.selectedText = target as SVGTextElement;
-					this.selectedText.classList.add('text-selected');
-				}
-
-				if (this.selectedPath && this.selectedText) {
-					svgxShowStatus('Path and Text selected. Ready for Encode.', 2000);
-				} else if (this.selectedPath) {
-					svgxShowStatus('Path selected. Ready for Logical Copy.', 1500);
-				} else if (this.selectedText) {
-					svgxShowStatus('Text selected.', 1500);
-				}
-			});
-		});
-
 		this.svgRoot.addEventListener('click', (event) => {
-			if (event.target === this.svgRoot) {
+			event.stopPropagation();
+			// Start with the most generic Element type.
+			let target = event.target as Element;
+
+			// --- START: BUG FIX LOGIC (with correct TypeScript types) ---
+
+			// Fix 1: Ascend from <tspan> to its parent <text> element.
+			// Use 'instanceof SVGElement' as a type guard to ensure the parent is an SVG element.
+			if (target.tagName.toLowerCase() === 'tspan' && target.parentElement instanceof SVGElement) {
+				target = target.parentElement;
+			}
+
+			// Fix 2: If an invisible rect in a legend group is clicked, retarget to the text.
+			if (target.tagName.toLowerCase() === 'rect') {
+				const parentGroup = target.parentElement;
+				if (parentGroup && parentGroup.tagName.toLowerCase() === 'g') {
+					const textElement = parentGroup.querySelector('text');
+					if (textElement) {
+						console.log('SVGX: Click on legend rect, retargeting to sibling text element.');
+						target = textElement;
+					}
+				}
+			}
+
+			// --- END: BUG FIX LOGIC ---
+
+			// Perform selection based on the corrected target's type.
+			// Using 'instanceof' here is the safest way to check the type before assigning.
+			if (target instanceof SVGPathElement) {
+				if (this.selectedPath) {
+					this.selectedPath.classList.remove('path-selected');
+				}
+				this.selectedPath = target;
+				this.selectedPath.classList.add('path-selected');
+
+			} else if (target instanceof SVGTextElement) {
+				if (this.selectedText) {
+					this.selectedText.classList.remove('text-selected');
+				}
+				this.selectedText = target;
+				this.selectedText.classList.add('text-selected');
+
+			} else if (target === this.svgRoot) {
+				// If the background was clicked, clear all selections.
 				if (this.selectedPath) {
 					this.selectedPath.classList.remove('path-selected');
 					this.selectedPath = null;
@@ -601,6 +612,16 @@ class SvgxLogicalOperations {
 					this.selectedText = null;
 				}
 				svgxShowStatus('Selection cleared.', 1500);
+				return;
+			}
+
+			// Provide user feedback.
+			if (this.selectedPath && this.selectedText) {
+				svgxShowStatus('Path and Text selected. Ready to Associate.', 2000);
+			} else if (this.selectedPath) {
+				svgxShowStatus('Path selected. Ready for Logical Copy.', 1500);
+			} else if (this.selectedText) {
+				svgxShowStatus('Text selected.', 1500);
 			}
 		});
 	}
