@@ -335,24 +335,39 @@ function findElementByElementInfo(elementInfo: { tagName: string; id?: string; c
 		return { element: null, desc: `${tagName}[${index}] not found` };
 	}
 
-	// Strategy 4: Attribute-based CSS selector
+	// Strategy 4: Attribute-based direct DOM traversal
 	if (elementInfo.keyAttributes && Object.keys(elementInfo.keyAttributes).length > 0) {
-		let attributeSelector = elementInfo.tagName.toLowerCase();
+		const tagName = elementInfo.tagName.toLowerCase();
 		const attrs: string[] = [];
-		for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
-			if (attr === 'd' && value) {
-				attributeSelector += `[d="${value}"]`;
-				attrs.push(`d="${value}"`);
-			} else if (attr !== 'text-content') {
-				attributeSelector += `[${attr}="${CSS.escape(value)}"]`;
+		const elements = document.getElementsByTagName(tagName);
+		// console.log(`[findElementByElementInfo] Searching for <${tagName}> with keyAttributes:`, elementInfo.keyAttributes);
+		for (let i = 0; i < elements.length; i++) {
+			const el = elements[i];
+			let allMatch = true;
+			// console.log(`[findElementByElementInfo] Checking element #${i}:`, el);
+			for (const [attr, value] of Object.entries(elementInfo.keyAttributes)) {
+				if (attr === 'text-content') {
+					continue;
+				}
+				const elAttrValue = el.getAttribute(attr);
+				// Normalize both expected and actual values (remove whitespace and line breaks)
+				const normalizedExpected = typeof value === 'string' ? value.replace(/\s+/g, '') : value;
+				const normalizedActual = typeof elAttrValue === 'string' ? elAttrValue.replace(/\s+/g, '') : elAttrValue;
+				//console.log(`[findElementByElementInfo]   Attribute '${attr}': expected='${value}', actual='${elAttrValue}', normalizedExpected='${normalizedExpected}', normalizedActual='${normalizedActual}'`);
+				if (normalizedActual !== normalizedExpected) {
+					allMatch = false;
+					break;
+				}
 				attrs.push(`${attr}="${value}"`);
 			}
+			if (allMatch) {
+				// console.log(`[findElementByElementInfo]   MATCH FOUND: <${tagName}>[${attrs.join('][')}]`, el);
+				return { element: el, desc: `${tagName}[${attrs.join('][')}]` };
+			} else {
+				console.log(`[findElementByElementInfo]   No match for element #${i}`);
+			}
 		}
-
-		const element = document.querySelector(attributeSelector);
-		if (element) {
-			return { element, desc: `${elementInfo.tagName.toLowerCase()}[${attrs.join('][')}]` };
-		}
+		console.log(`[findElementByElementInfo] No matching <${tagName}> found for keyAttributes.`);
 	}
 
 	// Strategy 5: Class-based selector

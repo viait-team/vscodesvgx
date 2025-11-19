@@ -214,7 +214,10 @@ function selectElementInTree(elementInfo: any) {
 					if (attr === 'text-content' || attr === 'element-index') {
 						continue; // Skip special attributes
 					}
-					if (currentElement.getAttribute(attr) !== value) {
+					const elAttrValue = currentElement.getAttribute(attr);
+					const normalizedExpected = typeof value === 'string' ? value.replace(/\s+/g, '') : value;
+					const normalizedActual = typeof elAttrValue === 'string' ? elAttrValue.replace(/\s+/g, '') : elAttrValue;
+					if (normalizedActual !== normalizedExpected) {
 						allMatch = false;
 						break;
 					}
