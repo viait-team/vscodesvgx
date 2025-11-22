@@ -111,7 +111,7 @@ function buildWin32Setup(arch, target) {
 			Quality: quality
 		};
 
-		if (quality !== 'exploration') {
+		if (quality !== 'exploration' && quality !== 'dev') {
 			definitions['AppxPackage'] = `${quality === 'stable' ? 'code' : 'code_insider'}_${arch}.appx`;
 			definitions['AppxPackageDll'] = `${quality === 'stable' ? 'code' : 'code_insider'}_explorer_command_${arch}.dll`;
 			definitions['AppxPackageName'] = `${product.win32AppUserModelId}`;

@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 # --- Configuration ---
-$BuildTask = "vscode-win32-x64-min"
+$BuildTask = "vscode-win32-x64"
 $InstallerTask = "vscode-win32-x64-user-setup"
 $InstallerDir = "installer"
 $InstallerZipName = "VSCode-installer.zip"
@@ -30,6 +30,14 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 Write-Host "VS Code build completed."
+
+Write-Host "Building Inno Updater..."
+npm run gulp -- vscode-win32-x64-inno-updater
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Inno Updater build failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
+}
+Write-Host "Inno Updater build completed."
 
 Write-Host "Creating installer..."
 npm run gulp -- $InstallerTask
