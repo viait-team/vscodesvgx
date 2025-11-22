@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { SvgxEditorProvider } from './svgxEditorProvider';
+import { SvgxFileDecorationProvider } from './svgxFileDecorationProvider';
 // import { SvgxClipboardService } from './svgxClipboardService'; // Import the new service
 
 export function activate(context: vscode.ExtensionContext) {
@@ -19,6 +20,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register the custom editor provider, passing the singleton clipboard service instance.
 	// context.subscriptions.push(SvgxEditorProvider.register(context, clipboardService));
 	context.subscriptions.push(SvgxEditorProvider.register(context));
+
+	// Register FileDecorationProvider
+	const decorationProvider = new SvgxFileDecorationProvider();
+	context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorationProvider));
 
 	console.log('SVGX Extension: SvgxEditorProvider registered');
 }
