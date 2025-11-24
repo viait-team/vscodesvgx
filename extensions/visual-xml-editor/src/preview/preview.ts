@@ -11,11 +11,13 @@ class XmlPreview {
 	private _document: vscode.TextDocument | undefined;
 	private readonly _renderer: XmlDocumentRenderer;
 	private readonly _disposables: vscode.Disposable[] = [];
+	private readonly _editorProvider: any;
 
-	constructor(webviewPanel: vscode.WebviewPanel, document: vscode.TextDocument, private readonly _editorProvider: any) {
+	constructor(webviewPanel: vscode.WebviewPanel, document: vscode.TextDocument, editorProvider: any, context: vscode.ExtensionContext) {
 		this._webviewPanel = webviewPanel;
 		this._document = document;
-		this._renderer = new XmlDocumentRenderer();
+		this._editorProvider = editorProvider;
+		this._renderer = new XmlDocumentRenderer(context);
 
 		this._webviewPanel.onDidDispose(() => {
 			this.dispose();
@@ -285,7 +287,7 @@ export class DynamicXmlPreview {
 				}
 			);
 
-			this._preview = new XmlPreview(webviewPanel, document, this._editorProvider);
+			this._preview = new XmlPreview(webviewPanel, document, this._editorProvider, this._context);
 
 			// Clean up the reference when webview is disposed
 			webviewPanel.onDidDispose(() => {
@@ -294,7 +296,8 @@ export class DynamicXmlPreview {
 		}
 
 		this._preview.update();
-	} public get activePreview(): XmlPreview | undefined {
+	}
+	public get activePreview(): XmlPreview | undefined {
 		return this._preview;
 	}
 }

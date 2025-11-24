@@ -4,10 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-
 export class XmlDocumentRenderer {
+
+	constructor(private readonly context: vscode.ExtensionContext) { }
+
 	public async renderDocument(document: vscode.TextDocument, webview: vscode.Webview): Promise<string> {
 		const fileContent = document.getText();
 
@@ -18,27 +18,13 @@ export class XmlDocumentRenderer {
 		return await this.renderXmlPreview(fileContent, webview, document.uri);
 	}
 
-	private extensionRootFromBuiltPath(builtPath: string, searchName: string): string {
-		const normalized = path.normalize(builtPath);
-		const parts = normalized.split(path.sep);
-		const outIndex = parts.indexOf(searchName);
-		if (outIndex === -1) {
-			return normalized;
-		}
-		const rootParts = parts.slice(0, outIndex);
-		return rootParts.join(path.sep);
-	}
+	private async renderSvgPreview(svgContent: string, webview: vscode.Webview): Promise<string> {
 
-	private renderSvgPreview(svgContent: string, webview: vscode.Webview): string {
-		const dirname = this.extensionRootFromBuiltPath(__dirname, 'out');
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
-			vscode.Uri.file(dirname),
-			'media',
-			'previewWebview.js'
-		));
+			this.context.extensionUri, 'media', 'previewWebview.js'));
+		const htmlUri = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'previewWebview.html');
 
-		const htmlPath = path.join(dirname, 'media', 'previewWebview.html');
-		let html = fs.readFileSync(htmlPath, 'utf8');
+		let html = await vscode.workspace.fs.readFile(htmlUri).then(buffer => new TextDecoder().decode(buffer));
 
 		// Replace placeholders in HTML
 		html = html.replace('{{scriptUri}}', scriptUri.toString());
