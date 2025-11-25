@@ -704,7 +704,15 @@ class SvgxLogicalOperations {
 				}
 
 				const logicalX = this._toLogicalX(transformedPt.x, xlm[0], xlm[1], xlm[2], xlm[3]);
-				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm[3], ylm[2]);
+
+				let ylm1 = ylm[3];
+				let ylm2 = ylm[2];
+				if (ylm1 < ylm2) {
+					ylm1 = ylm[2];
+					ylm2 = ylm[3];
+				}
+				const logicalY = this._toLogicalY(transformedPt.y, ylm[0], ylm[1], ylm1, ylm2);
+
 				logicalPoints.push({ x: logicalX, y: logicalY });
 			}
 		});
@@ -714,24 +722,34 @@ class SvgxLogicalOperations {
 		const legendRefAttr = element.getAttribute('lc_legend_ref');
 		const legendData: any[] = [];
 		if (legendRefAttr) {
+			let legendIds: string[] = [];
 			try {
-				const legendIds = JSON.parse(legendRefAttr.replace(/'/g, '"'));
-				legendIds.forEach((id: string) => {
-					const defElement = this.svgRoot.querySelector(`text[lc_legend_id="${id}"]`);
-					const instElements = this.svgRoot.querySelectorAll(`*[lc_legend_instance="${id}"]`);
-
-					if (defElement) {
-						legendData.push({
-							id: id,
-							definitionElement: defElement.outerHTML,
-							definitionText: defElement.textContent || '',
-							instanceElements: Array.from(instElements).map(el => el.outerHTML)
-						});
-					}
-				});
+				// Try to parse as JSON (expecting an array of IDs)
+				const parsed = JSON.parse(legendRefAttr.replace(/'/g, '"'));
+				if (Array.isArray(parsed)) {
+					legendIds = parsed;
+				} else {
+					// If valid JSON but not an array, treat as a single ID
+					legendIds = [String(parsed)];
+				}
 			} catch (e) {
-				console.error('SVGX Error parsing lc_legend_ref:', e);
+				// If parsing fails, assume it's a simple string ID (legacy or auto-generated format)
+				legendIds = [legendRefAttr];
 			}
+
+			legendIds.forEach((id: string) => {
+				const defElement = this.svgRoot.querySelector(`text[lc_legend_id="${id}"]`);
+				const instElements = this.svgRoot.querySelectorAll(`*[lc_legend_instance="${id}"]`);
+
+				if (defElement) {
+					legendData.push({
+						id: id,
+						definitionElement: defElement.outerHTML,
+						definitionText: defElement.textContent || '',
+						instanceElements: Array.from(instElements).map(el => el.outerHTML)
+					});
+				}
+			});
 		}
 
 		const attributes: { [key: string]: string } = {};
@@ -787,7 +805,15 @@ class SvgxLogicalOperations {
 		const format = (v: number) => Number(v.toFixed(2));
 		const newPathData = logicalPoints.map((pt: any, i: number) => {
 			const visualX = format(this._fromLogicalX(pt.x, targetXlm[0], targetXlm[1], targetXlm[2], targetXlm[3]));
-			const visualY = format(this._fromLogicalY(pt.y, targetYlm[0], targetYlm[1], targetYlm[3], targetYlm[2]));
+
+			let ylm1 = targetYlm[3];
+			let ylm2 = targetYlm[2];
+			if (ylm1 < ylm2) {
+				ylm1 = targetYlm[2];
+				ylm2 = targetYlm[3];
+			}
+			const visualY = format(this._fromLogicalY(pt.y, targetYlm[0], targetYlm[1], ylm1, ylm2));
+
 			if (i === 0) {
 				textX = visualX;
 				textY = visualY;

@@ -12,6 +12,17 @@
 			]
 		},
 		{
+			"type": "chrome",
+			"request": "launch",
+			"name": "Open Active HTML File in Browser",
+			"file": "${file}",
+			"webRoot": "${workspaceFolder}",
+			"presentation": {
+				"group": "0_html",
+				"order": 1
+			}
+		},
+		{
 			"type": "node",
 			"request": "attach",
 			"restart": true,

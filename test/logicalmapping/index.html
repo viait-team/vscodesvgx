@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVGX Logical Mapping Validator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🔍 SVGX Logical Mapping Validator</h1>
+            <p>Interactive tool for validating <code>xlm</code> and <code>ylm</code> attributes in SVG charts</p>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Left Sidebar -->
+            <aside class="sidebar">
+                <section class="upload-section">
+                    <h2>📁 Load SVG File</h2>
+                    <div class="drop-zone" id="dropZone">
+                        <p>Drag & Drop SVG/SVGX file here</p>
+                        <p>or</p>
+                        <input type="file" id="fileInput" accept=".svg,.svgx" hidden>
+                        <button id="browseBtn">Browse Files</button>
+                    </div>
+                    <div id="fileInfo" class="file-info hidden"></div>
+                </section>
+
+                <section class="attributes-section">
+                    <h2>📊 Mapping Attributes</h2>
+                    <div id="attributesDisplay" class="attributes-display">
+                        <p class="placeholder">No file loaded</p>
+                    </div>
+                </section>
+
+                <section class="method-section">
+                    <h2>🎯 Method Detection</h2>
+                    <div id="methodDisplay" class="method-display">
+                        <p class="placeholder">No file loaded</p>
+                    </div>
+                </section>
+
+                <section class="debug-section">
+                    <h2>🐛 Debug Log</h2>
+                    <div id="debugLog" class="debug-log">
+                        <p class="placeholder">No file loaded</p>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- Main Panel -->
+            <main class="main-panel">
+                <section class="validation-section">
+                    <h2>✅ Validation Checklist</h2>
+                    <div id="validationChecklist" class="checklist">
+                        <div class="checklist-item" data-step="1">
+                            <span class="status">⏹</span>
+                            <span class="label">1. Validate xlm/ylm values</span>
+                            <div class="details hidden"></div>
+                        </div>
+                        <div class="checklist-item" data-step="2">
+                            <span class="status">⏹</span>
+                            <span class="label">2. Verify coordinate system flag</span>
+                            <div class="details hidden"></div>
+                        </div>
+                        <div class="checklist-item" data-step="3">
+                            <span class="status">⏹</span>
+                            <span class="label">3. Check for non-linear scales</span>
+                            <div class="details hidden"></div>
+                        </div>
+                        <div class="checklist-item" data-step="4">
+                            <span class="status">⏹</span>
+                            <span class="label">4. Inspect CTM information</span>
+                            <div class="details hidden"></div>
+                        </div>
+                        <div class="checklist-item" data-step="5">
+                            <span class="status">⏹</span>
+                            <span class="label">5. Test with known values</span>
+                            <div class="details hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="interactive-section">
+                    <h2>🖱️ Interactive Point Tester</h2>
+                    <div class="tester-container">
+                        <div id="svgPreview" class="svg-preview">
+                            <p class="placeholder">Load an SVG file to test points</p>
+                        </div>
+                        <div id="conversionResults" class="conversion-results">
+                            <h3>Conversion Results</h3>
+                            <div class="result-row">
+                                <label>Pixel Coordinates:</label>
+                                <span id="pixelCoords">-</span>
+                            </div>
+                            <div class="result-row">
+                                <label>Logical Coordinates:</label>
+                                <span id="logicalCoords">-</span>
+                            </div>
+                            <div class="result-row">
+                                <label>Method Used:</label>
+                                <span id="methodUsed">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="roundtrip-section">
+                    <h2>🔄 Round-Trip Conversion Tester</h2>
+                    <div class="roundtrip-tester">
+                        <div class="input-group">
+                            <label>Test Logical X:</label>
+                            <input type="number" id="testLogicalX" step="any" placeholder="e.g., 4.2">
+                        </div>
+                        <div class="input-group">
+                            <label>Test Logical Y:</label>
+                            <input type="number" id="testLogicalY" step="any" placeholder="e.g., 4.2">
+                        </div>
+                        <button id="testRoundTripBtn">Test Round-Trip</button>
+                        <div id="roundtripResults" class="roundtrip-results hidden">
+                            <div class="result-flow">
+                                <div class="flow-step">
+                                    <strong>Logical Input:</strong>
+                                    <span id="rtLogical1">-</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step">
+                                    <strong>Pixel:</strong>
+                                    <span id="rtPixel">-</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step">
+                                    <strong>Logical Output:</strong>
+                                    <span id="rtLogical2">-</span>
+                                </div>
+                            </div>
+                            <div class="accuracy-result">
+                                <strong>Accuracy:</strong>
+                                <span id="rtAccuracy">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="export-section">
+                    <button id="exportReportBtn" class="export-btn" disabled>📊 Export Validation Report</button>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script src="validator.js"></script>
+</body>
+
+</html>

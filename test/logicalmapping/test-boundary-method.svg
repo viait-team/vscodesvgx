@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test SVG for Method 1: Boundary Definition (d3.js/Highcharts style) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"
+     ylm="[3.6, 4.8, 120.5, 528.5]"
+     xlm="[638291232000000000, 639447264000000000, 80.5, 720.5]"
+     is_logical_mapping_local="false">
+
+    <!-- Background -->
+    <rect width="800" height="600" fill="#f9fafb"/>
+
+    <!-- Chart Area -->
+    <rect x="80.5" y="120.5" width="640" height="408" fill="white" stroke="#e5e7eb" stroke-width="2"/>
+
+    <!-- Grid Lines -->
+    <g stroke="#e5e7eb" stroke-width="1">
+        <line x1="80.5" y1="222.5" x2="720.5" y2="222.5"/>
+        <line x1="80.5" y1="324.5" x2="720.5" y2="324.5"/>
+        <line x1="80.5" y1="426.5" x2="720.5" y2="426.5"/>
+    </g>
+
+    <!-- Sample Data Line -->
+    <path d="M 150 300 L 250 250 L 350 350 L 450 200 L 550 280 L 650 320"
+          stroke="#2563eb"
+          stroke-width="3"
+          fill="none"/>
+
+    <!-- Chart Title -->
+    <text x="400" y="60" text-anchor="middle" font-size="24" font-weight="bold" fill="#111827">
+        Test Chart - Boundary Method
+    </text>
+
+    <!-- Y-axis Labels -->
+    <text x="70" y="125" text-anchor="end" font-size="12" fill="#6b7280">4.8</text>
+    <text x="70" y="227" text-anchor="end" font-size="12" fill="#6b7280">4.5</text>
+    <text x="70" y="329" text-anchor="end" font-size="12" fill="#6b7280">4.2</text>
+    <text x="70" y="431" text-anchor="end" font-size="12" fill="#6b7280">3.9</text>
+    <text x="70" y="533" text-anchor="end" font-size="12" fill="#6b7280">3.6</text>
+
+    <!-- Info Text -->
+    <text x="400" y="580" text-anchor="middle" font-size="14" fill="#6b7280">
+        ylm=[3.6, 4.8, 120.5, 528.5] - Boundary Method (d3.js style)
+    </text>
+</svg>
