@@ -27,6 +27,44 @@ class SvgxLogicalMapping {
 		if (dy_max === dy_min) return vy_max;
 		return vy_min + (dy - dy_min) * (vy_max - vy_min) / (dy_max - dy_min);
 	}
+
+	// Helper: Check if a value is .NET Ticks (large datetime number)
+	isDateTimeTicks(value) {
+		return Math.abs(value) > 1e15;
+	}
+
+	// Convert .NET Ticks to JavaScript Date
+	ticksToDate(ticks) {
+		const EPOCH_DIFF_DAYS = 719163;
+		const EPOCH_DIFF_SECONDS = EPOCH_DIFF_DAYS * 86400;
+		const TICKS_PER_SECOND = 10000000;
+		const total_seconds = Math.floor(Number(ticks) / TICKS_PER_SECOND);
+		const seconds_from_unix_epoch = total_seconds - EPOCH_DIFF_SECONDS;
+		return new Date(seconds_from_unix_epoch * 1000);
+	}
+
+	// Convert JavaScript Date to .NET Ticks
+	dateToTicks(date) {
+		const EPOCH_DIFF_DAYS = 719163;
+		const EPOCH_DIFF_SECONDS = EPOCH_DIFF_DAYS * 86400;
+		const TICKS_PER_SECOND = 10000000;
+		const seconds_from_unix_epoch = Math.round(date.getTime() / 1000);
+		const total_seconds = seconds_from_unix_epoch + EPOCH_DIFF_SECONDS;
+		return total_seconds * TICKS_PER_SECOND;
+	}
+
+	// Format date for display
+	formatDate(date) {
+		return date.toLocaleString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+			hour12: false
+		});
+	}
 }
 
 // App State
@@ -136,6 +174,7 @@ function parseSVG(svgContent, filename) {
 	displayDebugLog();
 	runValidation();
 	displaySVG();
+	updateDateTimeInputs();
 
 	// Enable export button
 	document.getElementById('exportReportBtn').disabled = false;
@@ -572,15 +611,50 @@ function handleSVGClick(event) {
 		ylm2
 	);
 
-	// Update UI
+	// Update UI with datetime support
+	let logicalXDisplay = logicalX.toFixed(4);
+	let logicalYDisplay = logicalY.toFixed(4);
+
+	if (state.mapping.isDateTimeTicks(logicalX)) {
+		const date = state.mapping.ticksToDate(logicalX);
+		logicalXDisplay = `${logicalX.toFixed(0)} → ${state.mapping.formatDate(date)}`;
+	}
+
 	document.getElementById('pixelCoords').textContent = `(${pixelX.toFixed(2)}, ${pixelY.toFixed(2)})`;
-	document.getElementById('logicalCoords').textContent = `(${logicalX.toFixed(4)}, ${logicalY.toFixed(4)})`;
+	document.getElementById('logicalCoords').innerHTML = `X: ${logicalXDisplay}<br>Y: ${logicalYDisplay}`;
 	document.getElementById('methodUsed').textContent = ylm2 < ylm1 ? 'Boundary Method' : 'Point-Pair Method';
+}
+
+// Update datetime inputs based on xlm detection
+function updateDateTimeInputs() {
+	if (!state.xlm) return;
+
+	const isDateTime = state.mapping.isDateTimeTicks(state.xlm[0]) || state.mapping.isDateTimeTicks(state.xlm[1]);
+
+	const dateInput = document.getElementById('testLogicalXDate');
+	const helperText = document.getElementById('xHelperText');
+
+	if (isDateTime) {
+		dateInput.classList.remove('hidden');
+		helperText.classList.remove('hidden');
+	} else {
+		dateInput.classList.add('hidden');
+		helperText.classList.add('hidden');
+	}
 }
 
 // Round-Trip Tester
 function setupRoundTripTester() {
 	document.getElementById('testRoundTripBtn').addEventListener('click', testRoundTrip);
+
+	// Handle date input conversion
+	document.getElementById('testLogicalXDate').addEventListener('change', function (e) {
+		if (e.target.value) {
+			const selectedDate = new Date(e.target.value);
+			const ticks = state.mapping.dateToTicks(selectedDate);
+			document.getElementById('testLogicalX').value = ticks;
+		}
+	});
 }
 
 function testRoundTrip() {
@@ -644,10 +718,24 @@ function testRoundTrip() {
 	const maxError = Math.max(errorX, errorY);
 	const accurate = maxError < 0.0001;
 
+	// Format display with datetime support
+	const isDateTime = state.mapping.isDateTimeTicks(logicalX);
+
+	let logical1Display, logical2Display;
+	if (isDateTime) {
+		const date1 = state.mapping.ticksToDate(logicalX);
+		const date2 = state.mapping.ticksToDate(logicalXBack);
+		logical1Display = `X: ${logicalX.toFixed(0)} (${state.mapping.formatDate(date1)})<br>Y: ${logicalY.toFixed(4)}`;
+		logical2Display = `X: ${logicalXBack.toFixed(0)} (${state.mapping.formatDate(date2)})<br>Y: ${logicalYBack.toFixed(4)}`;
+	} else {
+		logical1Display = `(${logicalX.toFixed(4)}, ${logicalY.toFixed(4)})`;
+		logical2Display = `(${logicalXBack.toFixed(4)}, ${logicalYBack.toFixed(4)})`;
+	}
+
 	// Update UI
-	document.getElementById('rtLogical1').textContent = `(${logicalX.toFixed(4)}, ${logicalY.toFixed(4)})`;
+	document.getElementById('rtLogical1').innerHTML = logical1Display;
 	document.getElementById('rtPixel').textContent = `(${pixelX.toFixed(2)}, ${pixelY.toFixed(2)})`;
-	document.getElementById('rtLogical2').textContent = `(${logicalXBack.toFixed(4)}, ${logicalYBack.toFixed(4)})`;
+	document.getElementById('rtLogical2').innerHTML = logical2Display;
 
 	const accuracySpan = document.getElementById('rtAccuracy');
 	if (accurate) {
