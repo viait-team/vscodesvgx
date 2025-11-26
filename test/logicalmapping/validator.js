@@ -166,6 +166,8 @@ function parseSVG(svgContent, filename) {
 	state.xlm = xlmAttr ? JSON.parse(xlmAttr) : null;
 	state.ylm = ylmAttr ? JSON.parse(ylmAttr) : null;
 	state.isLogicalMappingLocal = isLocalAttr === 'true';
+	state.x_start_date = svgElement.getAttribute('x_start_date');
+	state.x_scale_days = svgElement.getAttribute('x_scale_days');
 
 	// Update UI
 	displayFileInfo(filename);
@@ -273,6 +275,24 @@ function displayAttributes() {
             <code>${state.isLogicalMappingLocal !== null ? state.isLogicalMappingLocal : 'not set (defaults to false)'}</code>
         </div>
     `;
+
+	if (state.x_start_date) {
+		html += `
+            <div class="attr-row">
+                <strong>x_start_date</strong>
+                <code>${state.x_start_date}</code>
+            </div>
+        `;
+	}
+
+	if (state.x_scale_days) {
+		html += `
+            <div class="attr-row">
+                <strong>x_scale_days</strong>
+                <code>${state.x_scale_days}</code>
+            </div>
+        `;
+	}
 
 	display.innerHTML = html;
 }
