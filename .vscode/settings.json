@@ -9,7 +9,6 @@
 		"scripts/test-integration.bat": true,
 		"scripts/test-integration.sh": true,
 	},
-
 	// --- Editor ---
 	"editor.insertSpaces": false,
 	"editor.experimental.asyncTokenization": true,
@@ -18,7 +17,6 @@
 	// "editor.experimental.preferTreeSitter.typescript": true,
 	// "editor.experimental.preferTreeSitter.regex": true,
 	// "editor.experimental.preferTreeSitter.css": true,
-
 	// --- Language Specific ---
 	"[plaintext]": {
 		"files.insertFinalNewline": false
@@ -38,7 +36,6 @@
 	"[github-issues]": {
 		"editor.wordWrap": "on"
 	},
-
 	// --- Files ---
 	"files.trimTrailingWhitespace": true,
 	"files.insertFinalNewline": true,
@@ -81,7 +78,6 @@
 		"build/npm/*.js": true,
 		"build/*.js": true
 	},
-
 	// --- Search ---
 	"search.exclude": {
 		"**/node_modules": true,
@@ -103,7 +99,6 @@
 		"src/vs/editor/test/node/diffing/fixtures/**": true,
 		"build/loader.min": true
 	},
-
 	// --- TypeScript ---
 	"typescript.tsdk": "node_modules/typescript/lib",
 	"typescript.preferences.importModuleSpecifier": "relative",
@@ -116,7 +111,6 @@
 		"vscode-notebook-renderer",
 		"src/vs/workbench/workbench.web.main.internal.ts"
 	],
-
 	// --- Languages ---
 	"json.schemas": [
 		{
@@ -133,7 +127,6 @@
 		}
 	],
 	"css.format.spaceAroundSelectorSeparator": true,
-
 	// --- Git ---
 	"git.ignoreLimitWarning": true,
 	"git.branchProtection": [
@@ -151,7 +144,6 @@
 		"ts": "warning",
 		"eslint": "warning"
 	},
-
 	// --- GitHub ---
 	"githubPullRequests.experimental.createView": true,
 	"githubPullRequests.assignCreated": "${user}",
@@ -161,7 +153,6 @@
 	],
 	"githubPullRequests.codingAgent.enabled": true,
 	"githubPullRequests.codingAgent.uiIntegration": true,
-
 	// --- Testing & Debugging ---
 	"testing.autoRun.mode": "rerun",
 	"debug.javascript.terminalOptions": {
@@ -175,7 +166,6 @@
 			"${workspaceFolder}/extensions/*/out/**/*.js",
 		]
 	},
-
 	// --- Coverage ---
 	"lcov.path": [
 		"./.build/coverage/lcov.info",
@@ -190,7 +180,6 @@
 			}
 		}
 	],
-
 	// --- Tools ---
 	"npm.exclude": "**/extensions/**",
 	"eslint.useFlatConfig": true,
@@ -209,14 +198,13 @@
 		"git",
 		"sash"
 	],
-
 	// --- Workbench ---
 	"remote.extensionKind": {
 		"msjsdiag.debugger-for-chrome": "workspace"
 	},
 	"terminal.integrated.suggest.enabled": true,
 	"application.experimental.rendererProfiling": true,
-
 	"editor.aiStats.enabled": true, // Team selfhosting on ai stats
-	"chat.checkpoints.showFileChanges": true
+	"chat.checkpoints.showFileChanges": true,
+	"liveServer.settings.port": 5501
 }
