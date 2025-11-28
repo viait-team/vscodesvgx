@@ -14,7 +14,7 @@
     "watch": "npx gulp watch-extension:visual-xml-editor && npm run watch:webview",
     "compile:webview": "node ./esbuild.mjs",
     "watch:webview": "node ./esbuild.mjs --watch",
-    "build": "npm run compile"
+    "build": "node init && npm run compile"
   },
   "contributes": {
     "commands": [
